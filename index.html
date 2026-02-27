@@ -1,0 +1,2336 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!--
+    Based on the original Python script created by Jonathan Kung (teacher).
+    Developed into a web app with Gemini AI's assistance.
+    February 8, 2026
+    -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Processor V11.6</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- PDF Libraries -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+    <!-- Utilities -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <script>
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    </script>
+
+    <!-- Favicon -->
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="favicons/apple-touch-icon.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="favicons/favicon-32x32.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="favicons/favicon-16x16.png"
+    />
+    <link rel="manifest" href="favicons/site.webmanifest" />
+
+    <style>
+      body {
+        background-color: #323332;
+        color: #cf7f4b;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        overflow-x: hidden;
+        user-select: none;
+        touch-action: none;
+      }
+
+      /* Inputs & Scrollbar */
+      input[type="number"]::-webkit-outer-spin-button,
+      input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: #2a2a2a;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: #444;
+        border-radius: 4px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+
+      input[type="range"] {
+        -webkit-appearance: none;
+        background: transparent;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        height: 16px;
+        width: 16px;
+        border-radius: 50%;
+        background: #cf7f4b;
+        cursor: pointer;
+        margin-top: -6px;
+      }
+
+      input[type="range"]::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 4px;
+        cursor: pointer;
+        background: #4a4a4a;
+        border-radius: 2px;
+      }
+
+      /* Tabs */
+      .tab-btn {
+        padding: 12px 24px;
+        font-weight: bold;
+        border-bottom: 3px solid transparent;
+        color: #888;
+        transition: all 0.2s;
+      }
+
+      .tab-btn.active {
+        color: #cf7f4b;
+        border-bottom-color: #cf7f4b;
+        background-color: #2a2a2a;
+      }
+
+      .tab-btn:hover:not(.active) {
+        color: #bbb;
+        background-color: #3a3b3a;
+      }
+
+      /* Canvas Wrapper */
+      .page-wrapper {
+        position: relative;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        transform-origin: top center;
+        transition: transform 0.1s ease-out;
+        border: 1px solid #444;
+      }
+
+      .pdf-canvas {
+        display: block;
+      }
+
+      .draw-layer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        cursor: crosshair;
+        z-index: 10;
+      }
+
+      /* Elements (Box, Text, Image) */
+      .editor-el {
+        position: absolute;
+        box-sizing: border-box;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: all 0.1s;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .editor-el:hover {
+        border-color: #cf7f4b;
+        z-index: 20;
+      }
+
+      .editor-el.selected {
+        border: 2px solid #3b82f6;
+        z-index: 30;
+        box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        cursor: move;
+      }
+
+      /* Drawing State */
+      .editor-el.drawing {
+        border: 1px dashed #3b82f6 !important;
+        background-color: rgba(59, 130, 246, 0.1) !important;
+      }
+
+      .el-text-content {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        white-space: nowrap;
+        outline: none;
+        cursor: text;
+      }
+
+      .el-image-content {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        pointer-events: none;
+      }
+
+      /* Ghost Box - Identical style to real elements */
+      .ghost-box {
+        position: absolute;
+        box-sizing: border-box;
+        pointer-events: none;
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        border: 2px solid transparent;
+      }
+
+      /* Resize Handles */
+      .resize-handle {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background-color: white;
+        border: 1px solid #3b82f6;
+        border-radius: 50%;
+        z-index: 40;
+        box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+      }
+
+      /* Corners */
+      .handle-nw {
+        top: -5px;
+        left: -5px;
+        cursor: nw-resize;
+      }
+
+      .handle-ne {
+        top: -5px;
+        right: -5px;
+        cursor: ne-resize;
+      }
+
+      .handle-sw {
+        bottom: -5px;
+        left: -5px;
+        cursor: sw-resize;
+      }
+
+      .handle-se {
+        bottom: -5px;
+        right: -5px;
+        cursor: se-resize;
+      }
+
+      /* Sides */
+      .handle-n {
+        top: -5px;
+        left: 50%;
+        margin-left: -5px;
+        cursor: n-resize;
+      }
+
+      .handle-s {
+        bottom: -5px;
+        left: 50%;
+        margin-left: -5px;
+        cursor: s-resize;
+      }
+
+      .handle-w {
+        left: -5px;
+        top: 50%;
+        margin-top: -5px;
+        cursor: w-resize;
+      }
+
+      .handle-e {
+        right: -5px;
+        top: 50%;
+        margin-top: -5px;
+        cursor: e-resize;
+      }
+
+      .modal-overlay {
+        background-color: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(2px);
+      }
+
+      .btn-primary {
+        background-color: #cf7f4b;
+        color: #323332;
+        font-weight: bold;
+        padding: 10px 20px;
+        border-radius: 6px;
+        transition: all 0.2s;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+      }
+
+      .btn-primary:hover {
+        background-color: #e89560;
+        transform: translateY(-1px);
+      }
+
+      .btn-primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .tool-btn {
+        background: #4a4a4a;
+        color: #ccc;
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .tool-btn:hover {
+        background: #555;
+        color: white;
+      }
+
+      .tool-btn.active {
+        background: #cf7f4b;
+        color: #323332;
+        font-weight: bold;
+      }
+
+      /* Style Toggle Buttons (Bold/Italic/etc) */
+      .style-btn {
+        background: #333;
+        border: 1px solid #555;
+        color: #ccc;
+        width: 32px;
+        height: 32px;
+        border-radius: 4px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .style-btn.active {
+        background: #cf7f4b;
+        color: #323332;
+        border-color: #cf7f4b;
+      }
+
+      .style-btn:hover:not(.active) {
+        background: #444;
+      }
+
+      .input-dark {
+        background-color: #323332;
+        color: #cf7f4b;
+        border: 1px solid #555;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-weight: bold;
+        text-align: center;
+      }
+
+      .input-dark:focus {
+        outline: 2px solid #cf7f4b;
+        border-color: transparent;
+      }
+
+      .drop-active {
+        border-color: #cf7f4b !important;
+        background-color: #333 !important;
+      }
+
+      details > summary {
+        list-style: none;
+        cursor: pointer;
+        outline: none;
+      }
+
+      details > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      /* Tip Me button */
+      .tip-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background-color: #1e1e1e;
+        color: #cf7f4b;
+        border: 1.5px solid #cf7f4b;
+        font-weight: bold;
+        font-size: 0.85rem;
+        padding: 6px 14px;
+        border-radius: 6px;
+        text-decoration: none;
+        transition: all 0.2s;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        white-space: nowrap;
+      }
+
+      .tip-btn:hover {
+        background-color: #2a2a2a;
+        color: #e89560;
+        border-color: #e89560;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+      }
+    </style>
+  </head>
+
+  <body class="min-h-screen flex flex-col">
+    <!-- Top Navigation -->
+    <nav class="flex justify-center bg-[#1e1e1e] border-b border-[#444]">
+      <button
+        id="tab-run-btn"
+        class="tab-btn active"
+        onclick="switchTab('run')"
+      >
+        🚀 PDF Processor
+      </button>
+      <button id="tab-editor-btn" class="tab-btn" onclick="switchTab('editor')">
+        ✏️ Template Editor
+      </button>
+      <button id="tab-about-btn" class="tab-btn" onclick="switchTab('about')">
+        ℹ️ About
+      </button>
+    </nav>
+
+    <!-- TAB 1: PDF PROCESSOR -->
+    <section
+      id="tab-run"
+      class="flex-grow flex flex-col items-center justify-center p-6 w-full max-w-7xl mx-auto"
+    >
+      <div class="mb-10 w-full flex flex-col items-center">
+        <!-- Title row: title block + tip button side by side -->
+        <div class="flex items-start gap-4">
+          <div class="text-left">
+            <h1 class="text-3xl font-bold tracking-widest leading-tight">
+              PDF PROCESSOR
+            </h1>
+            <p class="text-sm font-mono mt-0.5 mb-3" style="color: #cf7f4b">
+              &gt; Jonathan Kung
+            </p>
+          </div>
+          <a
+            href="https://ko-fi.com/coolpuddytat"
+            target="_blank"
+            class="tip-btn mt-1"
+            title="Buy me a coffee ☕"
+          >
+            ☕ Tip Me
+          </a>
+        </div>
+        <p class="text-gray-400">
+          Process multiple class reports individually using a template.
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-6 w-full">
+        <!-- 1. Template Upload -->
+        <div
+          id="templateDropZone"
+          class="bg-[#2a2a2a] p-8 rounded-xl border-2 border-[#444] text-center flex flex-col items-center shadow-lg transition-colors cursor-pointer"
+          onclick="document.getElementById('batchTemplateInput').click()"
+        >
+          <div class="text-4xl mb-4 pointer-events-none">⚙️</div>
+          <h2 class="text-xl font-bold mb-2 pointer-events-none">
+            1. Load Template
+          </h2>
+          <p class="text-sm text-gray-400 mb-6 pointer-events-none">
+            Drag & Drop .json template here
+          </p>
+          <div class="flex gap-2 w-full justify-center pointer-events-none">
+            <input
+              type="file"
+              id="batchTemplateInput"
+              accept=".json"
+              class="hidden"
+              onchange="handleBatchTemplate(this)"
+            />
+            <button class="btn-primary w-40">SELECT FILE</button>
+          </div>
+          <div
+            id="batchTemplateStatus"
+            class="mt-4 text-sm font-mono text-[#cf7f4b] min-h-[20px] pointer-events-none"
+          ></div>
+
+          <!-- Helper for new users -->
+          <div
+            class="mt-6 pt-4 border-t border-[#444] w-full pointer-events-auto"
+            onclick="event.stopPropagation()"
+          >
+            <p class="text-xs text-gray-500 mb-2">
+              Don't have a template file?
+            </p>
+            <button
+              onclick="switchTab('editor')"
+              class="text-xs text-[#cf7f4b] underline hover:text-white"
+            >
+              Create one in Template Editor &rarr;
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Set Page Count (NEW) -->
+        <div
+          class="bg-[#2a2a2a] p-8 rounded-xl border-2 border-[#444] text-center flex flex-col items-center shadow-lg"
+        >
+          <div class="text-4xl mb-4">🔢</div>
+          <h2 class="text-xl font-bold mb-2">2. Set Page Count</h2>
+          <p class="text-sm text-gray-400 mb-6">
+            Pages per single student report
+          </p>
+
+          <div class="flex items-center justify-center gap-2 mb-2 w-full">
+            <button
+              onclick="adjustBatchPages(-1)"
+              class="text-[#cf7f4b] hover:text-white text-2xl font-bold px-4 py-2 bg-[#333] rounded border border-[#555]"
+            >
+              -
+            </button>
+            <input
+              type="number"
+              id="batchPagesPerStudent"
+              value="1"
+              min="1"
+              class="w-20 bg-[#333] text-[#cf7f4b] border border-[#555] text-center font-bold text-2xl rounded p-2 focus:outline-none focus:border-[#cf7f4b]"
+            />
+            <button
+              onclick="adjustBatchPages(1)"
+              class="text-[#cf7f4b] hover:text-white text-2xl font-bold px-4 py-2 bg-[#333] rounded border border-[#555]"
+            >
+              +
+            </button>
+          </div>
+          <p class="text-xs text-gray-500 mt-2">
+            Verify against your PDF document.
+          </p>
+        </div>
+
+        <!-- 3. PDF Upload & Run -->
+        <div
+          id="batchDropZone"
+          class="bg-[#2a2a2a] p-8 rounded-xl border-2 border-[#444] text-center flex flex-col items-center shadow-lg transition-colors cursor-pointer"
+          onclick="document.getElementById('batchPdfInput').click()"
+        >
+          <div class="text-4xl mb-4 pointer-events-none">📑</div>
+          <h2 class="text-xl font-bold mb-2 pointer-events-none">
+            3. Process Reports
+          </h2>
+          <p class="text-sm text-gray-400 mb-6 pointer-events-none">
+            Drag & Drop PDFs here to start
+          </p>
+
+          <input
+            type="file"
+            id="batchPdfInput"
+            multiple
+            accept=".pdf"
+            class="hidden"
+            onchange="handleBatchRun(this.files)"
+          />
+
+          <div
+            class="flex flex-row gap-4 w-full justify-center pointer-events-none"
+          >
+            <button class="btn-primary w-40">SELECT PDFS</button>
+          </div>
+          <div
+            id="batchRunStatus"
+            class="mt-4 text-sm font-mono text-[#cf7f4b] min-h-[20px] pointer-events-none"
+          ></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: TEMPLATE EDITOR -->
+    <section
+      id="tab-editor"
+      class="flex-grow flex flex-col items-center p-4 hidden relative"
+    >
+      <!-- Editor Toolbar -->
+      <div
+        class="flex flex-wrap justify-between items-center w-full max-w-6xl bg-[#2a2a2a]/80 backdrop-blur-md p-2 rounded-lg shadow-xl sticky top-2 z-50 mb-6 border border-[#444]/50 gap-4"
+      >
+        <!-- Tool Selection -->
+        <div class="flex items-center gap-2 px-2 border-r border-[#555]">
+          <button
+            class="tool-btn active"
+            id="tool-box"
+            onclick="setTool('box')"
+            title="Redact Box"
+          >
+            <span>⬛</span> Redact
+          </button>
+          <button
+            class="tool-btn"
+            id="tool-text"
+            onclick="setTool('text')"
+            title="Add Text"
+          >
+            <span>T</span> Text
+          </button>
+          <button
+            class="tool-btn"
+            id="tool-image"
+            onclick="setTool('image')"
+            title="Add Image"
+          >
+            <span>🖼️</span> Image
+          </button>
+          <!-- Hidden image input for the tool -->
+          <input
+            type="file"
+            id="toolImageInput"
+            accept="image/*"
+            class="hidden"
+            onchange="handleImageUpload(this)"
+          />
+        </div>
+
+        <!-- Pages Config -->
+        <div class="flex flex-col items-center px-2">
+          <label
+            class="text-[9px] font-bold text-gray-400 uppercase tracking-wider"
+            >Pages / Student</label
+          >
+          <div class="flex items-center gap-1">
+            <button
+              onclick="adjustPages(-1)"
+              class="text-[#cf7f4b] hover:text-white px-1 font-bold"
+            >
+              -
+            </button>
+            <input
+              type="number"
+              id="pagesPerStudent"
+              value="1"
+              min="1"
+              class="w-10 bg-[#323332] text-[#cf7f4b] border border-[#cf7f4b] text-center font-bold rounded text-sm"
+              onkeydown="if (event.key === 'Enter') refreshEditorPages();"
+            />
+            <button
+              onclick="refreshEditorPages()"
+              class="bg-[#4a4a4a] text-white text-[10px] px-2 py-0.5 rounded hover:bg-[#555] border border-[#555]"
+            >
+              Set
+            </button>
+            <button
+              onclick="adjustPages(1)"
+              class="text-[#cf7f4b] hover:text-white px-1 font-bold"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <!-- Zoom -->
+        <div class="flex flex-col items-center px-2 w-32">
+          <div class="flex justify-between w-full">
+            <label class="text-[9px] font-bold text-gray-400 uppercase"
+              >Zoom</label
+            >
+            <span id="zoomLabel" class="text-[9px] font-mono text-[#cf7f4b]"
+              >100%</span
+            >
+          </div>
+          <input
+            type="range"
+            id="zoomSlider"
+            min="20"
+            max="300"
+            value="100"
+            class="w-full accent-[#cf7f4b]"
+            oninput="handleZoomSlider(this.value)"
+          />
+        </div>
+
+        <!-- File Actions -->
+        <div class="flex items-center gap-2 pl-2 border-l border-[#555]">
+          <button
+            onclick="saveTemplateFromEditor()"
+            class="tool-btn border border-[#cf7f4b] text-[#cf7f4b] hover:bg-[#cf7f4b] hover:text-[#323332]"
+          >
+            Save
+          </button>
+          <button
+            onclick="document.getElementById('editorTemplateInput').click()"
+            class="tool-btn"
+          >
+            Load
+          </button>
+          <input
+            type="file"
+            id="editorTemplateInput"
+            accept=".json"
+            class="hidden"
+            onchange="loadTemplateToEditor(this)"
+          />
+          <button
+            onclick="showResetModal()"
+            class="text-xs text-red-400 hover:text-red-300 ml-2"
+          >
+            Reset
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 1: Upload Reference (Drop Zone) -->
+      <div id="step1" class="text-center py-12 w-full max-w-4xl">
+        <div
+          id="dropZone"
+          class="border-2 border-dashed border-[#cf7f4b] rounded-xl p-10 transition-all duration-200 cursor-pointer mx-auto hover:bg-[#3a3b3a]"
+          onclick="document.getElementById('templateInput').click()"
+        >
+          <div class="text-6xl mb-4 pointer-events-none">📄</div>
+          <p class="text-xl font-bold mb-2 pointer-events-none">
+            Upload Reference PDF
+          </p>
+          <p class="text-sm opacity-70 pointer-events-none">
+            Drag & Drop file here or Click to Browse
+          </p>
+          <input
+            type="file"
+            id="templateInput"
+            accept=".pdf"
+            class="hidden"
+            onchange="loadPdfToEditor(this)"
+          />
+        </div>
+      </div>
+
+      <!-- Step 2: Canvas Area -->
+      <div
+        id="editorArea"
+        class="hidden w-full flex flex-col items-center pb-32"
+      >
+        <div
+          id="pagesContainer"
+          class="flex flex-col items-center gap-4 w-full transition-transform"
+        ></div>
+      </div>
+
+      <!-- Floating Properties Panel (Movable & Centered) -->
+      <div
+        id="boxPropsPanel"
+        class="hidden fixed w-72 bg-[#2a2a2a]/90 backdrop-blur-md border border-[#cf7f4b] rounded-lg shadow-2xl p-4 z-[60]"
+        style="top: 50%; left: 50%; transform: translate(-50%, -50%)"
+      >
+        <div
+          id="propsHeader"
+          class="flex justify-between items-center mb-3 pb-2 border-b border-[#555] cursor-move select-none"
+        >
+          <h3 class="font-bold text-sm text-white" id="propsTitle">
+            Properties
+          </h3>
+          <button onclick="closeProps()" class="text-gray-400 hover:text-white">
+            &times;
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <!-- Common: Pattern -->
+          <div>
+            <label class="text-xs text-gray-400 uppercase font-bold"
+              >Repetition Pattern</label
+            >
+            <select
+              id="propPattern"
+              class="w-full bg-[#333] border border-[#555] rounded p-1 text-sm mt-1 text-white"
+              onchange="updateElement()"
+            >
+              <option value="student">Per Student (Default)</option>
+              <option value="rest">Rest of Student Report</option>
+              <option value="all">Every Single Page</option>
+              <option value="range">Specific Page Range</option>
+            </select>
+          </div>
+          <div id="pageRangeGroup" class="hidden">
+            <label class="text-xs text-gray-400 uppercase font-bold"
+              >Student Page Range</label
+            >
+            <input
+              type="text"
+              id="propRange"
+              placeholder="e.g. 1, 3-5"
+              class="w-full bg-[#333] border border-[#555] rounded p-1 text-sm mt-1 text-white"
+              onchange="updateElement()"
+            />
+            <p class="text-[10px] text-gray-400 mt-1">
+              Relative to each student (e.g. Page 1 of 5)
+            </p>
+          </div>
+
+          <!-- Box Specific -->
+          <div id="props-box" class="hidden">
+            <label class="text-xs text-gray-400 uppercase font-bold"
+              >Fill Color</label
+            >
+            <div class="flex gap-2">
+              <input
+                type="color"
+                id="propColor"
+                class="w-8 h-8 rounded cursor-pointer"
+                onchange="updateElement()"
+              />
+              <span
+                id="propColorHex"
+                class="text-xs self-center font-mono text-gray-400"
+              ></span>
+            </div>
+          </div>
+
+          <!-- Text Specific -->
+          <div id="props-text" class="hidden space-y-3">
+            <!-- Text Controls -->
+            <div class="flex justify-between items-center gap-2">
+              <div class="flex gap-1">
+                <button
+                  id="btnBold"
+                  class="style-btn"
+                  onclick="toggleStyle('bold')"
+                  title="Bold"
+                >
+                  B
+                </button>
+                <button
+                  id="btnItalic"
+                  class="style-btn italic"
+                  onclick="toggleStyle('italic')"
+                  title="Italic"
+                >
+                  I
+                </button>
+                <button
+                  id="btnUnderline"
+                  class="style-btn underline"
+                  onclick="toggleStyle('underline')"
+                  title="Underline"
+                >
+                  U
+                </button>
+              </div>
+              <input
+                type="color"
+                id="propTextColor"
+                class="w-8 h-8 rounded cursor-pointer"
+                oninput="updateElement()"
+              />
+            </div>
+
+            <div class="flex gap-2">
+              <select
+                id="propFontFamily"
+                class="bg-[#333] border border-[#555] rounded p-1 text-xs text-white flex-1"
+                onchange="updateElement()"
+              >
+                <option value="Helvetica">Helvetica (Sans)</option>
+                <option value="Times-Roman">Times (Serif)</option>
+                <option value="Courier">Courier (Mono)</option>
+              </select>
+            </div>
+
+            <div>
+              <div
+                class="flex justify-between text-xs text-gray-400 font-bold mb-1"
+              >
+                <span>SIZE</span>
+                <span id="fontSizeDisplay">16px</span>
+              </div>
+              <input
+                type="range"
+                id="propFontSize"
+                min="8"
+                max="72"
+                value="16"
+                class="w-full accent-[#cf7f4b]"
+                oninput="updateElement()"
+              />
+            </div>
+
+            <!-- Advanced Toggle -->
+            <details class="text-sm border-t border-[#444] pt-2">
+              <summary
+                class="text-xs font-bold text-gray-400 hover:text-white flex items-center justify-between"
+              >
+                Advanced Styles <span>▼</span>
+              </summary>
+              <div class="pt-2 space-y-2">
+                <!-- Shadow -->
+                <div class="flex items-center justify-between">
+                  <label class="text-xs text-gray-300">Drop Shadow</label>
+                  <input
+                    type="checkbox"
+                    id="propShadow"
+                    class="accent-[#cf7f4b]"
+                    onchange="updateElement()"
+                  />
+                </div>
+                <!-- Border -->
+                <div class="flex items-center justify-between">
+                  <label class="text-xs text-gray-300">Border Width</label>
+                  <input
+                    type="number"
+                    id="propBorderWidth"
+                    min="0"
+                    max="10"
+                    value="0"
+                    class="input-dark w-12 text-xs"
+                    onchange="updateElement()"
+                  />
+                </div>
+                <div class="flex items-center justify-between">
+                  <label class="text-xs text-gray-300">Border Color</label>
+                  <input
+                    type="color"
+                    id="propBorderColor"
+                    class="w-6 h-6 rounded cursor-pointer"
+                    oninput="updateElement()"
+                  />
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <!-- Image Specific -->
+          <div id="props-image" class="hidden">
+            <img
+              id="propImagePreview"
+              class="w-full h-32 object-contain bg-black/20 rounded border border-[#555] mb-2"
+            />
+            <button
+              onclick="document.getElementById('toolImageInput').click()"
+              class="w-full bg-[#444] hover:bg-[#555] text-xs py-1 rounded"
+            >
+              Change Image
+            </button>
+          </div>
+
+          <button
+            onclick="deleteSelectedBox()"
+            class="w-full bg-red-900/50 hover:bg-red-900 text-red-200 text-sm py-2 rounded border border-red-800 transition"
+          >
+            Delete Element
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: ABOUT -->
+    <section
+      id="tab-about"
+      class="flex-grow flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto hidden"
+    >
+      <div
+        class="bg-[#2a2a2a] p-10 rounded-xl border border-[#444] shadow-xl w-full"
+      >
+        <h1 class="text-3xl font-bold mb-6 text-[#cf7f4b]">
+          About PDF Processor
+        </h1>
+
+        <p class="text-gray-300 mb-6 leading-relaxed">
+          This tool was originally designed to remove numerical marks from
+          reports generated by the
+          <a
+            href="https://jumpro.pe/"
+            target="_blank"
+            class="text-[#cf7f4b] hover:text-white underline"
+            ><strong>JumpRope</strong></a
+          >
+          assessment tracking software, helping teachers focus on qualitative
+          feedback. However, it has evolved into a fully general-purpose PDF
+          editor that allows you to redact content, add text overlays, or insert
+          images into <em>any</em> batch of PDF files using a repeating template
+          pattern.
+        </p>
+
+        <div class="bg-[#333] p-4 rounded-lg border border-[#555] mb-8">
+          <p class="text-gray-300 text-sm">
+            <strong class="text-[#cf7f4b]">PRO TIP:</strong> When generating
+            reports in <strong>JumpRope</strong>, select the
+            <strong class="text-white">"Duplex"</strong> option. This ensures
+            that every student report has the same number of pages (by inserting
+            blank pages where necessary), preventing alignment issues during
+            batch processing.
+          </p>
+        </div>
+
+        <div class="border-t border-[#444] my-6"></div>
+
+        <h2 class="text-xl font-bold mb-4 text-white">How to Use</h2>
+        <ol class="list-decimal list-inside space-y-3 text-gray-300 mb-8 pl-2">
+          <li>
+            <strong class="text-[#cf7f4b]">Create a Template:</strong> Go to the
+            <em>Template Editor</em> tab and upload a sample PDF file (e.g., one
+            student's report).
+          </li>
+          <li>
+            <strong class="text-[#cf7f4b]">Define Rules:</strong> Set the "Pages
+            per Student". Draw boxes to redact areas, add text, or insert
+            images.
+          </li>
+          <li>
+            <strong class="text-[#cf7f4b]">Set Patterns:</strong> Use the
+            properties panel to choose how often these boxes repeat (e.g., "Per
+            Student", "Every Page", "Rest of Report").
+          </li>
+          <li>
+            <strong class="text-[#cf7f4b]">Save Template:</strong> Click the
+            "Save" button to download your .json configuration file.
+          </li>
+          <li>
+            <strong class="text-[#cf7f4b]">Process Batch:</strong> Go to the
+            <em>PDF Processor</em> tab. Load your saved template, verify the
+            page count, and drag in all your student reports. The app will
+            process each file automatically.
+          </li>
+        </ol>
+
+        <div class="border-t border-[#444] my-6"></div>
+
+        <h2 class="text-xl font-bold mb-4 text-white">Credits</h2>
+        <p class="text-gray-400 text-sm">
+          Original concept and Python script by
+          <strong class="text-white">Jonathan Kung</strong> (Teacher).<br />
+          Web application architecture and development by
+          <strong class="text-white">Gemini AI</strong>.
+        </p>
+
+        <div class="border-t border-[#444] my-6"></div>
+
+        <!-- Support My Work -->
+        <h2 class="text-xl font-bold mb-4 text-white">☕ Support My Work</h2>
+        <p class="text-gray-300 mb-6 leading-relaxed">
+          I'm a full-time teacher who builds tools like this in my free time. If
+          PDF Processor saves you even a few minutes, I'd really appreciate a
+          coffee — it keeps me motivated to keep improving it!
+        </p>
+        <iframe
+          id="kofiframe"
+          src="https://ko-fi.com/coolpuddytat/?hidefeed=true&widget=true&embed=true&preview=true"
+          style="
+            border: none;
+            width: 100%;
+            padding: 4px;
+            background: #f9f9f9;
+            border-radius: 8px;
+          "
+          height="712"
+          title="Support coolpuddytat on Ko-fi"
+        ></iframe>
+      </div>
+    </section>
+
+    <!-- Reset Modal -->
+    <div
+      id="resetModal"
+      class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    >
+      <div
+        class="bg-[#2a2a2a] border border-[#cf7f4b] p-6 rounded-lg shadow-2xl max-w-sm w-full text-center"
+      >
+        <h3 class="text-xl font-bold text-white mb-4">Reset Options</h3>
+        <div class="flex flex-col gap-3">
+          <button
+            onclick="clearAllElements()"
+            class="btn-primary bg-[#cf7f4b] hover:bg-[#e89560] text-[#323332]"
+          >
+            Clear All Elements (Keep PDF)
+          </button>
+          <button
+            onclick="resetEditorState()"
+            class="btn-primary bg-transparent border border-[#cf7f4b] text-[#cf7f4b] hover:bg-[#333]"
+          >
+            Start Fresh (New PDF)
+          </button>
+          <button
+            onclick="closeResetModal()"
+            class="text-gray-500 text-sm hover:text-white mt-2"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div
+      id="loadingOverlay"
+      class="fixed inset-0 modal-overlay z-[100] hidden flex flex-col items-center justify-center"
+    >
+      <div
+        class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#cf7f4b] mb-4"
+      ></div>
+      <h2 id="loadingText" class="text-2xl font-bold text-white">
+        Processing...
+      </h2>
+    </div>
+
+    <script>
+      // --- STATE ---
+      let currentTab = "run";
+      let currentTool = "box";
+      let currentZoom = 1.0;
+      let loadedBatchTemplate = null;
+      let editorPageData = [];
+      let selectedBoxId = null;
+      let currentEditorPdf = null;
+      let pendingImageSrc = null;
+      let pendingImageBoxId = null;
+      const EDITOR_RENDER_SCALE = 1.5;
+
+      // --- TABS & INIT ---
+      function switchTab(tab) {
+        currentTab = tab;
+        document
+          .querySelectorAll(".tab-btn")
+          .forEach((b) => b.classList.remove("active"));
+        document.getElementById(`tab-${tab}-btn`).classList.add("active");
+
+        // Hide all
+        ["run", "editor", "about"].forEach((t) => {
+          const el = document.getElementById(`tab-${t}`);
+          if (el) el.classList.add("hidden");
+        });
+        // Show target
+        document.getElementById(`tab-${tab}`).classList.remove("hidden");
+      }
+
+      function setTool(tool) {
+        currentTool = tool;
+        document
+          .querySelectorAll(".tool-btn")
+          .forEach((b) => b.classList.remove("active"));
+        document.getElementById(`tool-${tool}`).classList.add("active");
+        deselectBox();
+      }
+
+      // --- BATCH RUNNER ---
+      // 1. Template Drop Zone
+      const templateZone = document.getElementById("templateDropZone");
+      ["dragenter", "dragover", "dragleave", "drop"].forEach((eName) => {
+        templateZone.addEventListener(
+          eName,
+          (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          },
+          false,
+        );
+      });
+      templateZone.addEventListener("dragenter", () =>
+        templateZone.classList.add("drop-active"),
+      );
+      templateZone.addEventListener("dragleave", () =>
+        templateZone.classList.remove("drop-active"),
+      );
+      templateZone.addEventListener("drop", (e) => {
+        templateZone.classList.remove("drop-active");
+        handleBatchTemplate({ files: e.dataTransfer.files });
+      });
+
+      // 2. PDF Drop Zone
+      const batchDropZone = document.getElementById("batchDropZone");
+      ["dragenter", "dragover", "dragleave", "drop"].forEach((eName) => {
+        batchDropZone.addEventListener(
+          eName,
+          (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          },
+          false,
+        );
+      });
+      batchDropZone.addEventListener("dragenter", () =>
+        batchDropZone.classList.add("drop-active"),
+      );
+      batchDropZone.addEventListener("dragleave", () =>
+        batchDropZone.classList.remove("drop-active"),
+      );
+      batchDropZone.addEventListener("drop", (e) => {
+        batchDropZone.classList.remove("drop-active");
+        handleBatchRun(e.dataTransfer.files);
+      });
+
+      function adjustBatchPages(delta) {
+        const input = document.getElementById("batchPagesPerStudent");
+        let val = parseInt(input.value) || 1;
+        input.value = Math.max(1, val + delta);
+      }
+
+      function handleBatchTemplate(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            loadedBatchTemplate = JSON.parse(e.target.result);
+            document.getElementById("batchTemplateStatus").innerText =
+              "✅ Template Loaded";
+            if (loadedBatchTemplate.pagesPerStudent)
+              document.getElementById("batchPagesPerStudent").value =
+                loadedBatchTemplate.pagesPerStudent;
+            document.getElementById("btnRunBatch").disabled = false;
+          } catch (err) {
+            alert("Invalid Template");
+          }
+        };
+        reader.readAsText(file);
+      }
+
+      async function handleBatchRun(files) {
+        if (!loadedBatchTemplate) return alert("Load template first.");
+        if (!files || files.length === 0) return alert("Select PDF files.");
+        await processPdfs(files);
+      }
+
+      async function processPdfs(files) {
+        toggleLoading(true, "Processing...");
+        const pagesPerStudent =
+          parseInt(document.getElementById("batchPagesPerStudent").value) || 1;
+
+        try {
+          let processedCount = 0;
+
+          // Process files sequentially
+          for (const file of files) {
+            if (file.type !== "application/pdf") continue;
+
+            const arrayBuffer = await file.arrayBuffer();
+            const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+            const pages = pdfDoc.getPages();
+
+            // Embed Fonts
+            const fonts = {
+              Helvetica: await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica),
+              "Helvetica-Bold": await pdfDoc.embedFont(
+                PDFLib.StandardFonts.HelveticaBold,
+              ),
+              "Helvetica-Oblique": await pdfDoc.embedFont(
+                PDFLib.StandardFonts.HelveticaOblique,
+              ),
+              "Helvetica-BoldOblique": await pdfDoc.embedFont(
+                PDFLib.StandardFonts.HelveticaBoldOblique,
+              ),
+              "Times-Roman": await pdfDoc.embedFont(
+                PDFLib.StandardFonts.TimesRoman,
+              ),
+              "Times-Bold": await pdfDoc.embedFont(
+                PDFLib.StandardFonts.TimesRomanBold,
+              ),
+              "Times-Italic": await pdfDoc.embedFont(
+                PDFLib.StandardFonts.TimesRomanItalic,
+              ),
+              "Times-BoldItalic": await pdfDoc.embedFont(
+                PDFLib.StandardFonts.TimesRomanBoldItalic,
+              ),
+              Courier: await pdfDoc.embedFont(PDFLib.StandardFonts.Courier),
+              "Courier-Bold": await pdfDoc.embedFont(
+                PDFLib.StandardFonts.CourierBold,
+              ),
+              "Courier-Oblique": await pdfDoc.embedFont(
+                PDFLib.StandardFonts.CourierOblique,
+              ),
+              "Courier-BoldOblique": await pdfDoc.embedFont(
+                PDFLib.StandardFonts.CourierBoldOblique,
+              ),
+            };
+
+            const imageCache = {};
+
+            for (let pIndex = 0; pIndex < pages.length; pIndex++) {
+              const page = pages[pIndex];
+              const { width, height } = page.getSize();
+              const relIndex = pIndex % pagesPerStudent;
+
+              for (
+                let tRelIndex = 0;
+                tRelIndex < loadedBatchTemplate.boxes.length;
+                tRelIndex++
+              ) {
+                const pageBoxes = loadedBatchTemplate.boxes[tRelIndex];
+                const templateRelPage = tRelIndex % pagesPerStudent;
+
+                for (const box of pageBoxes) {
+                  let apply = false;
+                  if (box.pattern === "student" && templateRelPage === relIndex)
+                    apply = true;
+                  else if (box.pattern === "all") apply = true;
+                  else if (
+                    box.pattern === "rest" &&
+                    relIndex >= templateRelPage
+                  )
+                    apply = true;
+                  else if (
+                    box.pattern === "range" &&
+                    isPageInRange(relIndex, box.pageRange)
+                  )
+                    apply = true;
+
+                  if (apply) {
+                    const rw = box.refWidth || 612;
+                    const rh = box.refHeight || 792;
+                    const sx = width / rw;
+                    const sy = height / rh;
+
+                    const x = box.x * sx;
+                    const w = box.w * sx;
+                    const h = box.h * sy;
+                    const y = height - box.y * sy - h;
+
+                    if (box.type === "box") {
+                      const c = hexToRgb(box.color || "#000000");
+                      page.drawRectangle({
+                        x,
+                        y,
+                        width: w,
+                        height: h,
+                        color: PDFLib.rgb(c.r, c.g, c.b),
+                      });
+                    } else if (box.type === "text") {
+                      const fontSize = (box.fontSize || 12) * sy;
+                      const c = hexToRgb(box.textColor || "#000000");
+
+                      // Determine Font
+                      let fontName = box.fontFamily || "Helvetica";
+                      if (box.bold && box.italic)
+                        fontName +=
+                          fontName === "Times-Roman"
+                            ? "BoldItalic"
+                            : "-BoldOblique";
+                      else if (box.bold)
+                        fontName +=
+                          fontName === "Times-Roman" ? "Bold" : "-Bold";
+                      else if (box.italic)
+                        fontName +=
+                          fontName === "Times-Roman" ? "Italic" : "-Oblique";
+
+                      if (fontName === "Courier-Bold-Oblique")
+                        fontName = "Courier-BoldOblique";
+                      if (fontName === "Helvetica-Bold-Oblique")
+                        fontName = "Helvetica-BoldOblique";
+
+                      const selectedFont =
+                        fonts[fontName] || fonts["Helvetica"];
+
+                      // Draw Box Border if set
+                      if (box.borderWidth > 0) {
+                        const bc = hexToRgb(box.borderColor || "#000000");
+                        page.drawRectangle({
+                          x: x,
+                          y: y,
+                          width: w,
+                          height: h,
+                          borderColor: PDFLib.rgb(bc.r, bc.g, bc.b),
+                          borderWidth: box.borderWidth * sx,
+                          color: undefined,
+                        });
+                      }
+
+                      // Draw Shadow
+                      if (box.shadow) {
+                        const textWidth = selectedFont.widthOfTextAtSize(
+                          box.text || "",
+                          fontSize,
+                        );
+                        const drawX = x + (w - textWidth) / 2 + 4;
+                        const drawY = y + h / 2 - fontSize / 3 - 4;
+                        page.drawText(box.text || "", {
+                          x: drawX,
+                          y: drawY,
+                          size: fontSize,
+                          font: selectedFont,
+                          color: PDFLib.rgb(0.5, 0.5, 0.5),
+                          opacity: 0.5,
+                        });
+                      }
+
+                      const textWidth = selectedFont.widthOfTextAtSize(
+                        box.text || "",
+                        fontSize,
+                      );
+                      const drawX = x + (w - textWidth) / 2;
+                      const drawY = y + h / 2 - fontSize / 3;
+
+                      page.drawText(box.text || "", {
+                        x: drawX,
+                        y: drawY,
+                        size: fontSize,
+                        font: selectedFont,
+                        color: PDFLib.rgb(c.r, c.g, c.b),
+                      });
+
+                      if (box.underline) {
+                        page.drawLine({
+                          start: { x: drawX, y: drawY - 2 },
+                          end: { x: drawX + textWidth, y: drawY - 2 },
+                          thickness: 1,
+                          color: PDFLib.rgb(c.r, c.g, c.b),
+                        });
+                      }
+                    } else if (box.type === "image" && box.imageSrc) {
+                      let img = imageCache[box.id];
+                      if (!img) {
+                        if (box.imageSrc.startsWith("data:image/png"))
+                          img = await pdfDoc.embedPng(box.imageSrc);
+                        else img = await pdfDoc.embedJpg(box.imageSrc);
+                        imageCache[box.id] = img;
+                      }
+                      const dims = img.scale(1);
+                      const imgRatio = dims.width / dims.height;
+                      const boxRatio = w / h;
+                      let drawW = w,
+                        drawH = h,
+                        drawX = x,
+                        drawY = y;
+                      if (imgRatio > boxRatio) {
+                        drawH = w / imgRatio;
+                        drawY = y + (h - drawH) / 2;
+                      } else {
+                        drawW = h * imgRatio;
+                        drawX = x + (w - drawW) / 2;
+                      }
+                      page.drawImage(img, {
+                        x: drawX,
+                        y: drawY,
+                        width: drawW,
+                        height: drawH,
+                      });
+                    }
+                  }
+                }
+              }
+            }
+
+            const pdfBytes = await pdfDoc.save();
+            const newName = file.name.replace(".pdf", " PROCESSED.pdf");
+            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+            saveAs(blob, newName);
+
+            processedCount++;
+            document.getElementById("batchRunStatus").innerText =
+              `Processed ${processedCount}/${files.length}`;
+
+            await new Promise((r) => setTimeout(r, 500));
+          }
+          document.getElementById("batchRunStatus").innerText = "Done!";
+        } catch (e) {
+          console.error(e);
+          alert("Error processing files: " + e.message);
+        } finally {
+          toggleLoading(false);
+        }
+      }
+
+      // --- EDITOR LOGIC ---
+      const dropZone = document.getElementById("dropZone");
+      ["dragenter", "dragover", "dragleave", "drop"].forEach((eName) => {
+        dropZone.addEventListener(
+          eName,
+          (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          },
+          false,
+        );
+      });
+      dropZone.addEventListener("dragenter", () =>
+        dropZone.classList.add("bg-[#3a3b3a]", "scale-105"),
+      );
+      dropZone.addEventListener("dragleave", () =>
+        dropZone.classList.remove("bg-[#3a3b3a]", "scale-105"),
+      );
+      dropZone.addEventListener("drop", (e) => {
+        dropZone.classList.remove("bg-[#3a3b3a]", "scale-105");
+        loadPdfToEditor({ files: e.dataTransfer.files });
+      });
+
+      async function loadPdfToEditor(input) {
+        if (!input.files[0]) return;
+        toggleLoading(true, "Rendering...");
+        const ab = await input.files[0].arrayBuffer();
+        const pdf = await pdfjsLib.getDocument(new Uint8Array(ab)).promise;
+        currentEditorPdf = pdf;
+        editorPageData = [];
+        document.getElementById("pagesContainer").innerHTML = "";
+        await refreshEditorPages();
+        document.getElementById("step1").classList.add("hidden");
+        document.getElementById("editorArea").classList.remove("hidden");
+        toggleLoading(false);
+      }
+
+      async function refreshEditorPages() {
+        if (!currentEditorPdf) return;
+        const pps =
+          parseInt(document.getElementById("pagesPerStudent").value) || 1;
+        const count = Math.min(pps, currentEditorPdf.numPages);
+
+        for (let i = 1; i <= count; i++) {
+          if (!document.getElementById(`pageWrapper-${i - 1}`))
+            await renderEditorPage(i);
+          else
+            document
+              .getElementById(`pageWrapper-${i - 1}`)
+              .classList.remove("hidden");
+        }
+        for (let i = count; i < editorPageData.length; i++) {
+          if (document.getElementById(`pageWrapper-${i}`))
+            document.getElementById(`pageWrapper-${i}`).classList.add("hidden");
+        }
+        renderGhosts();
+      }
+
+      async function renderEditorPage(num) {
+        const page = await currentEditorPdf.getPage(num);
+        const scale = EDITOR_RENDER_SCALE;
+        const vp = page.getViewport({ scale });
+
+        const div = document.createElement("div");
+        div.className = "page-wrapper";
+        div.id = `pageWrapper-${num - 1}`;
+        div.style.width = vp.width + "px";
+        div.style.height = vp.height + "px";
+        div.style.transform = `scale(${currentZoom})`;
+
+        const cnv = document.createElement("canvas");
+        cnv.width = vp.width;
+        cnv.height = vp.height;
+        cnv.className = "pdf-canvas";
+
+        const layer = document.createElement("div");
+        layer.className = "draw-layer";
+        layer.id = `drawLayer-${num - 1}`;
+
+        div.append(cnv, layer);
+        document.getElementById("pagesContainer").append(div);
+
+        await page.render({ canvasContext: cnv.getContext("2d"), viewport: vp })
+          .promise;
+
+        // refWidth is visual width in editor
+        const pdfRefWidth = vp.width / scale;
+        const pdfRefHeight = vp.height / scale;
+
+        editorPageData[num - 1] = {
+          w: vp.width,
+          h: vp.height,
+          refPdfWidth: pdfRefWidth,
+          refPdfHeight: pdfRefHeight,
+          renderScale: scale,
+          ctx: cnv.getContext("2d"),
+          boxes: [],
+        };
+        initDraw(layer, num - 1);
+      }
+
+      // --- INTERACTION ---
+      function initDraw(layer, pIdx) {
+        let startX, startY, mode, activeEl, boxData, initGeo;
+
+        layer.onmousedown = (e) => {
+          // Allow focus on contenteditable
+          if (e.target.isContentEditable) return;
+
+          if (e.target.classList.contains("resize-handle")) {
+            mode = "resize";
+            activeEl = e.target;
+            boxData = findBox(activeEl.parentElement.id);
+            e.preventDefault();
+          } else if (
+            e.target.classList.contains("editor-el") ||
+            e.target.classList.contains("el-text-content")
+          ) {
+            const el = e.target.closest(".editor-el");
+            if (el === activeEl && currentTool === "text") return;
+            mode = "move";
+            activeEl = el;
+            selectBox(activeEl);
+            boxData = findBox(activeEl.id);
+            e.preventDefault();
+          } else {
+            deselectBox();
+            if (currentTool === "image") {
+              mode = "draw";
+            } else {
+              mode = "draw";
+            }
+
+            const rect = layer.getBoundingClientRect();
+            startX = (e.clientX - rect.left) / currentZoom;
+            startY = (e.clientY - rect.top) / currentZoom;
+
+            activeEl = createElDOM("temp", startX, startY, 0, 0);
+            // Add dashed class for drawing visibility
+            activeEl.classList.add("drawing");
+            layer.appendChild(activeEl);
+            e.preventDefault();
+          }
+
+          if (mode) {
+            const rect = layer.getBoundingClientRect();
+            if (mode !== "draw") {
+              startX = e.clientX;
+              startY = e.clientY;
+              initGeo = {
+                l: parseFloat(
+                  activeEl.parentElement?.style.left || activeEl.style.left,
+                ),
+                t: parseFloat(
+                  activeEl.parentElement?.style.top || activeEl.style.top,
+                ),
+                w: parseFloat(
+                  activeEl.parentElement?.style.width || activeEl.style.width,
+                ),
+                h: parseFloat(
+                  activeEl.parentElement?.style.height || activeEl.style.height,
+                ),
+              };
+              if (mode === "move")
+                initGeo = {
+                  l: parseFloat(activeEl.style.left),
+                  t: parseFloat(activeEl.style.top),
+                };
+            }
+
+            const move = (em) => {
+              const dx = (em.clientX - startX) / currentZoom;
+              const dy = (em.clientY - startY) / currentZoom;
+
+              if (mode === "draw") {
+                const cx = (em.clientX - rect.left) / currentZoom;
+                const cy = (em.clientY - rect.top) / currentZoom;
+                const w = cx - startX;
+                const h = cy - startY;
+                activeEl.style.left = (w < 0 ? cx : startX) + "px";
+                activeEl.style.top = (h < 0 ? cy : startY) + "px";
+                activeEl.style.width = Math.abs(w) + "px";
+                activeEl.style.height = Math.abs(h) + "px";
+              } else if (mode === "move") {
+                activeEl.style.left = initGeo.l + dx + "px";
+                activeEl.style.top = initGeo.t + dy + "px";
+                if (boxData) {
+                  boxData.x = initGeo.l + dx;
+                  boxData.y = initGeo.t + dy;
+                  renderGhosts();
+                }
+              } else if (mode === "resize") {
+                const p = activeEl.parentElement;
+                const h = activeEl.dataset.handle;
+                let nl = initGeo.l,
+                  nt = initGeo.t,
+                  nw = initGeo.w,
+                  nh = initGeo.h;
+
+                if (h.includes("e")) nw = Math.max(10, initGeo.w + dx);
+                if (h.includes("s")) nh = Math.max(10, initGeo.h + dy);
+                if (h.includes("w")) {
+                  const d = Math.min(initGeo.w - 10, dx);
+                  nl += d;
+                  nw -= d;
+                }
+                if (h.includes("n")) {
+                  const d = Math.min(initGeo.h - 10, dy);
+                  nt += d;
+                  nh -= d;
+                }
+
+                p.style.left = nl + "px";
+                p.style.top = nt + "px";
+                p.style.width = nw + "px";
+                p.style.height = nh + "px";
+                if (boxData) {
+                  boxData.x = nl;
+                  boxData.y = nt;
+                  boxData.w = nw;
+                  boxData.h = nh;
+                  renderGhosts();
+                }
+              }
+            };
+
+            const up = () => {
+              window.removeEventListener("mousemove", move);
+              window.removeEventListener("mouseup", up);
+              if (mode === "draw") {
+                activeEl.classList.remove("drawing");
+                const w = parseFloat(activeEl.style.width);
+                const h = parseFloat(activeEl.style.height);
+                if (w < 5 || h < 5) {
+                  activeEl.remove();
+                  return;
+                }
+
+                const l = parseFloat(activeEl.style.left);
+                const t = parseFloat(activeEl.style.top);
+                const id = "el_" + Date.now();
+                activeEl.id = id;
+
+                const pageRef = editorPageData[pIdx];
+                const newBox = {
+                  id,
+                  type: currentTool,
+                  x: l,
+                  y: t,
+                  w,
+                  h,
+                  pattern: "student",
+                  pageRange: "",
+                  refPdfWidth: pageRef.refPdfWidth,
+                  refPdfHeight: pageRef.refPdfHeight,
+                  renderScale: pageRef.renderScale,
+                  refWidth: pageRef.w,
+                  refHeight: pageRef.h,
+                };
+
+                if (currentTool === "box") {
+                  const hex = getDominantColor(
+                    editorPageData[pIdx].ctx,
+                    l,
+                    t,
+                    w,
+                    h,
+                  );
+                  activeEl.style.backgroundColor = hex;
+                  newBox.color = hex;
+                } else if (currentTool === "text") {
+                  activeEl.style.backgroundColor = "transparent";
+                  // Auto-clear text logic
+                  activeEl.innerHTML = `<div class="el-text-content" contenteditable="true" onfocus="if(this.innerText==='Text'){this.innerText='';}" onblur="updateTextContent(this)">Text</div>`;
+                  newBox.text = "Text";
+                  newBox.fontSize = 16;
+                  newBox.textColor = "#000000";
+                  newBox.fontFamily = "Helvetica";
+                  newBox.bold = false;
+                  newBox.italic = false;
+                  newBox.underline = false;
+                  newBox.shadow = false;
+                  newBox.borderWidth = 0;
+                  newBox.borderColor = "#000000";
+                } else if (currentTool === "image") {
+                  activeEl.style.backgroundColor = "rgba(0,0,0,0.1)";
+                  activeEl.innerHTML =
+                    '<div style="color:#888; font-size:10px; pointer-events:none;">Select Image...</div>';
+                  pendingImageBoxId = id;
+                  editorPageData[pIdx].boxes.push(newBox);
+                  document.getElementById("toolImageInput").click();
+                }
+
+                if (currentTool !== "image") {
+                  editorPageData[pIdx].boxes.push(newBox);
+                }
+
+                selectBox(activeEl);
+                renderGhosts();
+
+                if (currentTool === "text") {
+                  const rect = activeEl.getBoundingClientRect();
+                  const panel = document.getElementById("boxPropsPanel");
+                  panel.style.left = "50%";
+                  panel.style.transform = "translate(-50%, 0)";
+                  panel.style.top = rect.bottom + 20 + "px";
+                  const txtDiv = activeEl.querySelector(".el-text-content");
+                  if (txtDiv) txtDiv.focus();
+                  showProps(newBox);
+                } else if (currentTool === "image") {
+                  showProps(newBox);
+                }
+              }
+            };
+            window.addEventListener("mousemove", move);
+            window.addEventListener("mouseup", up);
+          }
+        };
+      }
+
+      function updateTextContent(el) {
+        const boxId = el.parentElement.id;
+        const box = findBox(boxId);
+        if (box) {
+          box.text = el.innerText;
+          renderGhosts();
+        }
+      }
+
+      // Panel Dragging
+      const panel = document.getElementById("boxPropsPanel");
+      const header = document.getElementById("propsHeader");
+      let isDraggingPanel = false;
+      let panelStartX, panelStartY, panelInitX, panelInitY;
+
+      header.onmousedown = (e) => {
+        isDraggingPanel = true;
+        const style = window.getComputedStyle(panel);
+        const matrix = style.transform;
+        if (matrix !== "none") {
+          const rect = panel.getBoundingClientRect();
+          panel.style.transform = "none";
+          panel.style.left = rect.left + "px";
+          panel.style.top = rect.top + "px";
+          panel.style.right = "auto";
+          panel.style.bottom = "auto";
+        }
+        panelStartX = e.clientX;
+        panelStartY = e.clientY;
+        const rect = panel.getBoundingClientRect();
+        panelInitX = rect.left;
+        panelInitY = rect.top;
+
+        const movePanel = (e) => {
+          if (!isDraggingPanel) return;
+          panel.style.left = panelInitX + e.clientX - panelStartX + "px";
+          panel.style.top = panelInitY + e.clientY - panelStartY + "px";
+          panel.style.right = "auto";
+        };
+        const stopPanel = () => {
+          isDraggingPanel = false;
+          window.removeEventListener("mousemove", movePanel);
+          window.removeEventListener("mouseup", stopPanel);
+        };
+        window.addEventListener("mousemove", movePanel);
+        window.addEventListener("mouseup", stopPanel);
+      };
+
+      // Image Tool Helper
+      function handleImageUpload(input) {
+        if (!input.files[0]) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const src = e.target.result;
+          if (pendingImageBoxId) {
+            updateImageBoxImage(pendingImageBoxId, src);
+            pendingImageBoxId = null;
+          } else if (selectedBoxId) {
+            const box = findBox(selectedBoxId);
+            if (box && box.type === "image")
+              updateImageBoxImage(selectedBoxId, src);
+          }
+          input.value = "";
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+
+      function updateImageBoxImage(id, src) {
+        const box = findBox(id);
+        if (!box) return;
+        box.imageSrc = src;
+        const el = document.getElementById(id);
+        if (el) {
+          el.innerHTML = `<img src="${src}" class="el-image-content">`;
+          el.style.backgroundColor = "transparent";
+        }
+        if (selectedBoxId === id) showProps(box);
+        renderGhosts();
+      }
+
+      function placeImage(src) {
+        let pIdx = 0;
+        const x = 50,
+          y = 50,
+          w = 150,
+          h = 150;
+        const id = "el_" + Date.now();
+        const pageRef = editorPageData[pIdx];
+
+        const el = createElDOM("image", x, y, w, h);
+        el.id = id;
+        el.innerHTML = `<img src="${src}" class="el-image-content">`;
+
+        const layer = document.getElementById(`drawLayer-${pIdx}`);
+        layer.appendChild(el);
+
+        const newBox = {
+          id,
+          type: "image",
+          x,
+          y,
+          w,
+          h,
+          pattern: "student",
+          pageRange: "",
+          imageSrc: src,
+          refPdfWidth: pageRef.refPdfWidth,
+          refPdfHeight: pageRef.refPdfHeight,
+          renderScale: pageRef.renderScale,
+          refWidth: pageRef.w,
+          refHeight: pageRef.h,
+        };
+        editorPageData[pIdx].boxes.push(newBox);
+        selectBox(el);
+        renderGhosts();
+        showProps(newBox);
+      }
+
+      function createElDOM(type, x, y, w, h) {
+        const div = document.createElement("div");
+        div.className = "editor-el";
+        div.style.left = x + "px";
+        div.style.top = y + "px";
+        div.style.width = w + "px";
+        div.style.height = h + "px";
+        if (type !== "image" && type !== "text")
+          div.style.backgroundColor = "rgba(255,255,255,0.5)";
+        return div;
+      }
+
+      // --- GHOSTS ---
+      function renderGhosts() {
+        document.querySelectorAll(".ghost-box").forEach((e) => e.remove());
+        const pps =
+          parseInt(document.getElementById("pagesPerStudent").value) || 1;
+
+        editorPageData.forEach((pd, sIdx) => {
+          if (!pd) return;
+          pd.boxes.forEach((box) => {
+            editorPageData.forEach((tPd, tIdx) => {
+              if (!tPd || sIdx === tIdx) return;
+
+              let show = false;
+              if (box.pattern === "all") show = true;
+              else if (box.pattern === "rest" && tIdx >= sIdx) show = true;
+              else if (
+                box.pattern === "range" &&
+                isPageInRange(tIdx, box.pageRange)
+              )
+                show = true;
+
+              if (show) {
+                const g = createElDOM(box.type, box.x, box.y, box.w, box.h);
+                g.className = "ghost-box";
+                if (box.type === "box") g.style.backgroundColor = box.color;
+                if (box.type === "text") {
+                  g.innerHTML = `<div class="el-text-content" style="font-size:${box.fontSize}px; color:${box.textColor}; font-family:${getVisualFont(box)}; font-weight:${box.bold ? "bold" : "normal"}; font-style:${box.italic ? "italic" : "normal"}; text-decoration:${box.underline ? "underline" : "none"}; text-shadow:${box.shadow ? "2px 2px 2px rgba(0,0,0,0.5)" : "none"};">${box.text}</div>`;
+                  g.style.backgroundColor = "transparent";
+                  if (box.borderWidth > 0) {
+                    g.style.border = `${box.borderWidth}px solid ${box.borderColor}`;
+                  }
+                }
+                if (box.type === "image") {
+                  if (box.imageSrc) {
+                    g.innerHTML = `<img src="${box.imageSrc}" class="el-image-content">`;
+                    g.style.backgroundColor = "transparent";
+                  } else {
+                    g.style.backgroundColor = "rgba(0,0,0,0.1)";
+                  }
+                }
+                document.getElementById(`drawLayer-${tIdx}`).appendChild(g);
+              }
+            });
+          });
+        });
+      }
+
+      function getVisualFont(box) {
+        if (box.fontFamily === "Times-Roman") return "Times New Roman, serif";
+        if (box.fontFamily === "Courier") return "Courier New, monospace";
+        return "Arial, sans-serif";
+      }
+
+      // --- PROPERTIES ---
+      function selectBox(el) {
+        document.querySelectorAll(".selected").forEach((e) => {
+          e.classList.remove("selected");
+          e.querySelectorAll(".resize-handle").forEach((h) => h.remove());
+        });
+        el.classList.add("selected");
+        selectedBoxId = el.id;
+
+        // Add 8 handles
+        ["nw", "ne", "sw", "se", "n", "e", "s", "w"].forEach((d) => {
+          const h = document.createElement("div");
+          h.className = `resize-handle handle-${d}`;
+          h.dataset.handle = d; // Use full property for dataset
+          el.appendChild(h);
+        });
+
+        const box = findBox(selectedBoxId);
+        if (box) showProps(box);
+      }
+
+      function findBox(id) {
+        for (let p of editorPageData) {
+          if (p) {
+            const b = p.boxes.find((x) => x.id === id);
+            if (b) return b;
+          }
+        }
+      }
+
+      function showProps(box) {
+        const panel = document.getElementById("boxPropsPanel");
+        panel.classList.remove("hidden");
+        document.getElementById("propsTitle").innerText =
+          box.type.toUpperCase() + " Properties";
+
+        // Common
+        document.getElementById("propPattern").value = box.pattern;
+        document.getElementById("propRange").value = box.pageRange || "";
+        document
+          .getElementById("pageRangeGroup")
+          .classList.toggle("hidden", box.pattern !== "range");
+
+        // Type specific
+        document
+          .getElementById("props-box")
+          .classList.toggle("hidden", box.type !== "box");
+        document
+          .getElementById("props-text")
+          .classList.toggle("hidden", box.type !== "text");
+        document
+          .getElementById("props-image")
+          .classList.toggle("hidden", box.type !== "image");
+
+        if (box.type === "box") {
+          document.getElementById("propColor").value = box.color || "#ffffff";
+          document.getElementById("propColorHex").innerText = box.color;
+        } else if (box.type === "text") {
+          // Removed propTextContent references per user request for fix
+          document.getElementById("propFontSize").value = box.fontSize || 12;
+          document.getElementById("fontSizeDisplay").innerText =
+            (box.fontSize || 12) + "px";
+          document.getElementById("propTextColor").value =
+            box.textColor || "#000000";
+
+          document
+            .getElementById("btnBold")
+            .classList.toggle("active", !!box.bold);
+          document
+            .getElementById("btnItalic")
+            .classList.toggle("active", !!box.italic);
+          document
+            .getElementById("btnUnderline")
+            .classList.toggle("active", !!box.underline);
+          document.getElementById("propFontFamily").value =
+            box.fontFamily || "Helvetica";
+
+          document.getElementById("propShadow").checked = !!box.shadow;
+          document.getElementById("propBorderWidth").value =
+            box.borderWidth || 0;
+          document.getElementById("propBorderColor").value =
+            box.borderColor || "#000000";
+        } else if (box.type === "image") {
+          document.getElementById("propImagePreview").src = box.imageSrc;
+        }
+      }
+
+      function toggleStyle(style) {
+        const box = findBox(selectedBoxId);
+        if (!box) return;
+        box[style] = !box[style];
+        showProps(box); // Update UI button state
+        updateElement();
+      }
+
+      function updateElement() {
+        const box = findBox(selectedBoxId);
+        if (!box) return;
+
+        box.pattern = document.getElementById("propPattern").value;
+        box.pageRange = document.getElementById("propRange").value;
+        document
+          .getElementById("pageRangeGroup")
+          .classList.toggle("hidden", box.pattern !== "range");
+
+        if (box.type === "box") {
+          box.color = document.getElementById("propColor").value;
+          document.getElementById("propColorHex").innerText = box.color;
+          document.getElementById(selectedBoxId).style.backgroundColor =
+            box.color;
+        } else if (box.type === "text") {
+          box.fontSize = document.getElementById("propFontSize").value;
+          document.getElementById("fontSizeDisplay").innerText =
+            box.fontSize + "px";
+          box.textColor = document.getElementById("propTextColor").value;
+          box.fontFamily = document.getElementById("propFontFamily").value;
+          box.shadow = document.getElementById("propShadow").checked;
+          box.borderWidth = parseInt(
+            document.getElementById("propBorderWidth").value,
+          );
+          box.borderColor = document.getElementById("propBorderColor").value;
+
+          const el = document.getElementById(selectedBoxId);
+          const textDiv = el.querySelector(".el-text-content");
+          if (textDiv) {
+            // box.text is updated via contenteditable blur
+            textDiv.style.fontSize = box.fontSize + "px";
+            textDiv.style.color = box.textColor;
+            textDiv.style.fontFamily = getVisualFont(box);
+            textDiv.style.fontWeight = box.bold ? "bold" : "normal";
+            textDiv.style.fontStyle = box.italic ? "italic" : "normal";
+            textDiv.style.textDecoration = box.underline ? "underline" : "none";
+            textDiv.style.textShadow = box.shadow
+              ? "2px 2px 2px rgba(0,0,0,0.5)"
+              : "none";
+          }
+
+          if (box.borderWidth > 0) {
+            el.style.border = `${box.borderWidth}px solid ${box.borderColor}`;
+          } else {
+            el.style.border = "2px solid transparent";
+            if (el.classList.contains("selected"))
+              el.style.border = "2px solid #3b82f6";
+          }
+        }
+        renderGhosts();
+      }
+
+      function deleteSelectedBox() {
+        if (!selectedBoxId) return;
+        editorPageData.forEach((p) => {
+          if (p) p.boxes = p.boxes.filter((b) => b.id !== selectedBoxId);
+        });
+        document.getElementById(selectedBoxId).remove();
+        deselectBox();
+        renderGhosts();
+      }
+
+      function deselectBox() {
+        selectedBoxId = null;
+        document.querySelectorAll(".selected").forEach((e) => {
+          e.classList.remove("selected");
+          e.querySelectorAll(".resize-handle").forEach((h) => h.remove());
+          const id = e.id;
+          const box = findBox(id);
+          if (box && box.type === "text" && !box.borderWidth)
+            e.style.border = "2px solid transparent";
+        });
+        document.getElementById("boxPropsPanel").classList.add("hidden");
+      }
+
+      function closeProps() {
+        document.getElementById("boxPropsPanel").classList.add("hidden");
+        // Do NOT deselect box
+      }
+
+      // --- RESET MODAL ---
+      function showResetModal() {
+        document.getElementById("resetModal").classList.remove("hidden");
+      }
+      function closeResetModal() {
+        document.getElementById("resetModal").classList.add("hidden");
+      }
+      function clearAllElements() {
+        editorPageData.forEach((p) => {
+          if (p) p.boxes = [];
+        });
+        document.querySelectorAll(".editor-el").forEach((e) => e.remove());
+        document.querySelectorAll(".ghost-box").forEach((e) => e.remove());
+        deselectBox();
+        closeResetModal();
+      }
+      function resetEditorState() {
+        // Soft reset - just clear content
+        currentEditorPdf = null;
+        editorPageData = [];
+        selectedBoxId = null;
+        currentZoom = 1.0;
+        document.getElementById("pagesContainer").innerHTML = "";
+        document.getElementById("editorArea").classList.add("hidden");
+        document.getElementById("step1").classList.remove("hidden");
+        document.getElementById("boxPropsPanel").classList.add("hidden");
+        document.getElementById("templateInput").value = "";
+
+        closeResetModal();
+      }
+
+      // --- UTILS ---
+      function getDominantColor(ctx, x, y, w, h) {
+        try {
+          if (w < 1 || h < 1) return "#ffffff";
+          const data = ctx.getImageData(x, y, w, h).data;
+          const counts = {};
+          let max = 0;
+          let dom = "#ffffff";
+          for (let i = 0; i < data.length; i += 20) {
+            if (data[i + 3] < 50) continue;
+            const hex = rgbToHex(data[i], data[i + 1], data[i + 2]);
+            counts[hex] = (counts[hex] || 0) + 1;
+            if (counts[hex] > max) {
+              max = counts[hex];
+              dom = hex;
+            }
+          }
+          return dom;
+        } catch (e) {
+          return "#ffffff";
+        }
+      }
+      function rgbToHex(r, g, b) {
+        return (
+          "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)
+        );
+      }
+      function hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result
+          ? {
+              r: parseInt(result[1], 16) / 255,
+              g: parseInt(result[2], 16) / 255,
+              b: parseInt(result[3], 16) / 255,
+            }
+          : { r: 1, g: 1, b: 1 };
+      }
+      function isPageInRange(idx, str) {
+        if (!str) return false;
+        const t = idx + 1;
+        const parts = str.split(",");
+        for (let p of parts) {
+          p = p.trim();
+          if (p.includes("-")) {
+            const [s, e] = p.split("-").map(Number);
+            if (t >= s && t <= e) return true;
+          } else if (Number(p) === t) return true;
+        }
+        return false;
+      }
+      function toggleLoading(show, txt) {
+        const el = document.getElementById("loadingOverlay");
+        if (txt) document.getElementById("loadingText").innerText = txt;
+        el.classList.toggle("hidden", !show);
+      }
+      function saveTemplateFromEditor() {
+        const t = {
+          pagesPerStudent: document.getElementById("pagesPerStudent").value,
+          boxes: editorPageData.filter((p) => p).map((p) => p.boxes),
+        };
+        saveAs(
+          new Blob([JSON.stringify(t)], { type: "application/json" }),
+          "pdfprocessor_template.json",
+        );
+      }
+
+      function loadTemplateToEditor(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const template = JSON.parse(e.target.result);
+            if (template.pagesPerStudent)
+              document.getElementById("pagesPerStudent").value =
+                template.pagesPerStudent;
+            if (editorPageData.length > 0) {
+              document
+                .querySelectorAll(".editor-el")
+                .forEach((el) => el.remove());
+              document
+                .querySelectorAll(".ghost-box")
+                .forEach((el) => el.remove());
+              editorPageData.forEach((p) => {
+                if (p) p.boxes = [];
+              });
+              refreshEditorPages().then(() => {
+                template.boxes.forEach((pageBoxes, pIndex) => {
+                  if (
+                    pIndex < editorPageData.length &&
+                    editorPageData[pIndex]
+                  ) {
+                    const pageRef = editorPageData[pIndex];
+
+                    pageBoxes.forEach((box) => {
+                      // Legacy Support: If old template missing refWidth, assume standard visual 918 (612*1.5)
+                      const rw = box.refWidth || 918;
+                      const rh = box.refHeight || 1188;
+                      // But we need to map it to CURRENT editor visual size
+                      const scaleX = pageRef.w / rw;
+                      const scaleY = pageRef.h / rh;
+
+                      // Push to data
+                      const newBox = {
+                        ...box,
+                        // Adjust coords if they were saved on a different screen size/scale
+                        x: box.x * scaleX,
+                        y: box.y * scaleY,
+                        w: box.w * scaleX,
+                        h: box.h * scaleY,
+                        fontSize: box.fontSize
+                          ? box.fontSize * scaleY
+                          : undefined,
+                        refWidth: pageRef.w,
+                        refHeight: pageRef.h,
+                      };
+                      editorPageData[pIndex].boxes.push(newBox);
+
+                      const layer = document.getElementById(
+                        `drawLayer-${pIndex}`,
+                      );
+                      if (layer) {
+                        const el = createElDOM(
+                          box.type,
+                          newBox.x,
+                          newBox.y,
+                          newBox.w,
+                          newBox.h,
+                        );
+                        el.id = box.id;
+                        if (box.type === "box")
+                          el.style.backgroundColor = box.color;
+                        else if (box.type === "text") {
+                          el.innerHTML = `<div class="el-text-content" style="font-size:${newBox.fontSize}px; color:${box.textColor}">${box.text}</div>`;
+                          el.style.backgroundColor = "rgba(255,255,255,0.5)";
+                        } else if (box.type === "image") {
+                          el.innerHTML = `<img src="${box.imageSrc}" class="el-image-content">`;
+                          el.style.backgroundColor = "transparent";
+                        }
+                        layer.appendChild(el);
+                      }
+                    });
+                  }
+                });
+                renderGhosts();
+                alert("Template Loaded! Re-save recommended.");
+              });
+            } else alert("Please upload a Reference PDF to the editor first.");
+          } catch (err) {
+            console.error(err);
+            alert("Invalid Template File");
+          }
+        };
+        reader.readAsText(file);
+        input.value = "";
+      }
+
+      function adjustPages(d) {
+        const i = document.getElementById("pagesPerStudent");
+        i.value = Math.max(1, parseInt(i.value) + d);
+        refreshEditorPages();
+      }
+      function handleZoomSlider(v) {
+        currentZoom = v / 100;
+        document.getElementById("zoomLabel").innerText = v + "%";
+        document
+          .querySelectorAll(".page-wrapper")
+          .forEach((w) => (w.style.transform = `scale(${currentZoom})`));
+      }
+    </script>
+  </body>
+</html>
