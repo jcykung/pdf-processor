@@ -8,7 +8,7 @@
     -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PDF Processor V11.6</title>
+    <title>PDF Processor</title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -409,20 +409,36 @@
 
   <body class="min-h-screen flex flex-col">
     <!-- Top Navigation -->
-    <nav class="flex justify-center bg-[#1e1e1e] border-b border-[#444]">
-      <button
-        id="tab-run-btn"
-        class="tab-btn active"
-        onclick="switchTab('run')"
-      >
-        🚀 PDF Processor
-      </button>
-      <button id="tab-editor-btn" class="tab-btn" onclick="switchTab('editor')">
-        ✏️ Template Editor
-      </button>
-      <button id="tab-about-btn" class="tab-btn" onclick="switchTab('about')">
-        ℹ️ About
-      </button>
+    <nav class="flex items-center bg-[#1e1e1e] border-b border-[#444]">
+      <div class="flex flex-1 justify-center">
+        <button
+          id="tab-run-btn"
+          class="tab-btn active"
+          onclick="switchTab('run')"
+        >
+          🚀 PDF Processor
+        </button>
+        <button
+          id="tab-editor-btn"
+          class="tab-btn"
+          onclick="switchTab('editor')"
+        >
+          ✏️ Template Editor
+        </button>
+        <button id="tab-about-btn" class="tab-btn" onclick="switchTab('about')">
+          ℹ️ About
+        </button>
+      </div>
+      <!-- end centered tabs -->
+      <div class="flex items-center ml-auto pr-4 gap-3">
+        <button
+          onclick="openFilesModal()"
+          class="tip-btn"
+          style="margin: 6px 0"
+        >
+          🗂️ Files
+        </button>
+      </div>
     </nav>
 
     <!-- TAB 1: PDF PROCESSOR -->
@@ -578,127 +594,188 @@
       id="tab-editor"
       class="flex-grow flex flex-col items-center p-4 hidden relative"
     >
-      <!-- Editor Toolbar -->
+      <!-- Editor Toolbar — two rows -->
       <div
-        class="flex flex-wrap justify-between items-center w-full max-w-6xl bg-[#2a2a2a]/80 backdrop-blur-md p-2 rounded-lg shadow-xl sticky top-2 z-50 mb-6 border border-[#444]/50 gap-4"
+        class="inline-flex flex-col bg-[#2a2a2a]/80 backdrop-blur-md rounded-lg shadow-xl sticky top-2 z-50 mb-6 border border-[#444]/50"
       >
-        <!-- Tool Selection -->
-        <div class="flex items-center gap-2 px-2 border-r border-[#555]">
-          <button
-            class="tool-btn active"
-            id="tool-box"
-            onclick="setTool('box')"
-            title="Redact Box"
-          >
-            <span>⬛</span> Redact
-          </button>
-          <button
-            class="tool-btn"
-            id="tool-text"
-            onclick="setTool('text')"
-            title="Add Text"
-          >
-            <span>T</span> Text
-          </button>
-          <button
-            class="tool-btn"
-            id="tool-image"
-            onclick="setTool('image')"
-            title="Add Image"
-          >
-            <span>🖼️</span> Image
-          </button>
-          <!-- Hidden image input for the tool -->
-          <input
-            type="file"
-            id="toolImageInput"
-            accept="image/*"
-            class="hidden"
-            onchange="handleImageUpload(this)"
-          />
-        </div>
-
-        <!-- Pages Config -->
-        <div class="flex flex-col items-center px-2">
-          <label
-            class="text-[9px] font-bold text-gray-400 uppercase tracking-wider"
-            >Pages / Student</label
-          >
+        <!-- Row 1: Tools + Undo/Redo + Pages + Zoom -->
+        <div class="flex items-center gap-3 px-3 py-2 border-b border-[#333]">
+          <!-- Tools -->
           <div class="flex items-center gap-1">
             <button
-              onclick="adjustPages(-1)"
-              class="text-[#cf7f4b] hover:text-white px-1 font-bold"
+              class="tool-btn active text-xs px-2.5 py-1"
+              id="tool-box"
+              onclick="setTool('box')"
+              title="Redact Box"
             >
-              -
+              ⬛ Redact
+              <kbd
+                class="ml-1 text-[9px] bg-[#555] text-gray-300 px-1 py-px rounded font-sans"
+                >R</kbd
+              >
+            </button>
+            <button
+              class="tool-btn text-xs px-2.5 py-1"
+              id="tool-text"
+              onclick="setTool('text')"
+              title="Add Text"
+            >
+              T Text
+              <kbd
+                class="ml-1 text-[9px] bg-[#555] text-gray-300 px-1 py-px rounded font-sans"
+                >T</kbd
+              >
+            </button>
+            <button
+              class="tool-btn text-xs px-2.5 py-1"
+              id="tool-image"
+              onclick="setTool('image')"
+              title="Add Image"
+            >
+              🖼️ Image
+              <kbd
+                class="ml-1 text-[9px] bg-[#555] text-gray-300 px-1 py-px rounded font-sans"
+                >I</kbd
+              >
+            </button>
+            <input
+              type="file"
+              id="toolImageInput"
+              accept="image/*"
+              class="hidden"
+              onchange="handleImageUpload(this)"
+            />
+          </div>
+
+          <div class="h-5 w-px bg-[#555]"></div>
+
+          <!-- Undo / Redo -->
+          <div class="flex items-center gap-1">
+            <button
+              id="btn-undo"
+              onclick="editorUndo()"
+              class="tool-btn text-xs px-2.5 py-1 opacity-40"
+              title="Undo [Ctrl+Z]"
+              disabled
+            >
+              ↩ Undo
+            </button>
+            <button
+              id="btn-redo"
+              onclick="editorRedo()"
+              class="tool-btn text-xs px-2.5 py-1 opacity-40"
+              title="Redo [Ctrl+Y]"
+              disabled
+            >
+              ↪ Redo
+            </button>
+          </div>
+
+          <div class="h-5 w-px bg-[#555]"></div>
+
+          <!-- Pages/Student -->
+          <div class="flex items-center gap-1.5">
+            <span class="text-[10px] text-gray-400 whitespace-nowrap"
+              >Pages/student</span
+            >
+            <button
+              onclick="adjustPages(-1)"
+              class="text-[#cf7f4b] hover:text-white w-5 h-5 flex items-center justify-center font-bold text-base leading-none"
+            >
+              −
             </button>
             <input
               type="number"
               id="pagesPerStudent"
               value="1"
               min="1"
-              class="w-10 bg-[#323332] text-[#cf7f4b] border border-[#cf7f4b] text-center font-bold rounded text-sm"
+              class="w-8 bg-[#323332] text-[#cf7f4b] border border-[#cf7f4b] text-center font-bold rounded text-xs"
               onkeydown="if (event.key === 'Enter') refreshEditorPages();"
             />
             <button
-              onclick="refreshEditorPages()"
-              class="bg-[#4a4a4a] text-white text-[10px] px-2 py-0.5 rounded hover:bg-[#555] border border-[#555]"
-            >
-              Set
-            </button>
-            <button
               onclick="adjustPages(1)"
-              class="text-[#cf7f4b] hover:text-white px-1 font-bold"
+              class="text-[#cf7f4b] hover:text-white w-5 h-5 flex items-center justify-center font-bold text-base leading-none"
             >
               +
             </button>
-          </div>
-        </div>
-
-        <!-- Zoom -->
-        <div class="flex flex-col items-center px-2 w-32">
-          <div class="flex justify-between w-full">
-            <label class="text-[9px] font-bold text-gray-400 uppercase"
-              >Zoom</label
+            <button
+              onclick="refreshEditorPages()"
+              class="bg-[#3a3a3a] text-gray-400 text-[10px] px-2 py-0.5 rounded hover:bg-[#555] hover:text-white border border-[#555]"
             >
-            <span id="zoomLabel" class="text-[9px] font-mono text-[#cf7f4b]"
+              Set
+            </button>
+          </div>
+
+          <div class="h-5 w-px bg-[#555]"></div>
+
+          <!-- Zoom -->
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] text-gray-400 whitespace-nowrap"
+              >Zoom</span
+            >
+            <input
+              type="range"
+              id="zoomSlider"
+              min="20"
+              max="300"
+              value="100"
+              class="w-28 accent-[#cf7f4b]"
+              oninput="handleZoomSlider(this.value)"
+            />
+            <span
+              id="zoomLabel"
+              class="text-[10px] font-mono text-[#cf7f4b] w-9 text-right"
               >100%</span
             >
           </div>
-          <input
-            type="range"
-            id="zoomSlider"
-            min="20"
-            max="300"
-            value="100"
-            class="w-full accent-[#cf7f4b]"
-            oninput="handleZoomSlider(this.value)"
-          />
         </div>
 
-        <!-- File Actions -->
-        <div class="flex items-center gap-2 pl-2 border-l border-[#555]">
+        <!-- Row 2: Template name + file actions -->
+        <div class="flex items-center gap-3 px-3 py-2">
+          <!-- Template name -->
+          <span class="text-[10px] text-gray-400 whitespace-nowrap"
+            >Template</span
+          >
+          <input
+            type="text"
+            id="templateNameInput"
+            placeholder="Untitled Template"
+            class="input-dark text-xs px-2 py-1 text-left font-normal w-44"
+            oninput="onTemplateNameChange()"
+          />
+          <span
+            id="autosaveBadgeInline"
+            class="text-[10px] font-mono text-green-400 opacity-0 transition-opacity duration-500 whitespace-nowrap"
+            >● Saved</span
+          >
+
+          <div class="h-5 w-px bg-[#555]"></div>
+
+          <!-- Backup & Load -->
           <button
             onclick="saveTemplateFromEditor()"
-            class="tool-btn border border-[#cf7f4b] text-[#cf7f4b] hover:bg-[#cf7f4b] hover:text-[#323332]"
+            class="tool-btn text-xs px-2.5 py-1 border border-green-700 text-green-400 hover:bg-green-800 hover:text-white"
+            title="Download permanent .json backup"
           >
-            Save
+            Backup JSON
           </button>
-          <button
-            onclick="document.getElementById('editorTemplateInput').click()"
-            class="tool-btn"
+          <label
+            class="tool-btn text-xs px-2.5 py-1 cursor-pointer"
+            title="Load from a .json file"
           >
-            Load
-          </button>
-          <input
-            type="file"
-            id="editorTemplateInput"
-            accept=".json"
-            class="hidden"
-            onchange="loadTemplateToEditor(this)"
-          />
+            Load JSON
+            <input
+              type="file"
+              id="editorTemplateInput"
+              accept=".json"
+              class="hidden"
+              onchange="loadTemplateToEditor(this)"
+            />
+          </label>
+
           <button
             onclick="showResetModal()"
-            class="text-xs text-red-400 hover:text-red-300 ml-2"
+            class="text-xs text-red-400 hover:text-red-300"
           >
             Reset
           </button>
@@ -1005,8 +1082,12 @@
             Student", "Every Page", "Rest of Report").
           </li>
           <li>
-            <strong class="text-[#cf7f4b]">Save Template:</strong> Click the
-            "Save" button to download your .json configuration file.
+            <strong class="text-[#cf7f4b]">Save Template:</strong> Templates
+            autosave to your browser as you work — no save button needed. Give
+            your template a name in the toolbar. Use
+            <strong class="text-green-400">⬇ Backup</strong> in the toolbar or
+            the <strong>🗂️ Files</strong> panel to download a permanent
+            <code>.json</code> file.
           </li>
           <li>
             <strong class="text-[#cf7f4b]">Process Batch:</strong> Go to the
@@ -1018,7 +1099,138 @@
 
         <div class="border-t border-[#444] my-6"></div>
 
-        <h2 class="text-xl font-bold mb-4 text-white">Credits</h2>
+        <h2 class="text-xl font-bold mb-4 text-white">🗂️ Saving & Files</h2>
+        <p class="text-gray-300 mb-4 leading-relaxed">
+          Templates can be saved in two ways. They work together but serve
+          different purposes — it's important to understand both.
+        </p>
+
+        <div class="space-y-3 mb-5">
+          <!-- Tier 1: Browser -->
+          <div class="bg-[#333] rounded-lg border border-[#555] p-4">
+            <div class="flex items-center gap-2 mb-2">
+              <span>💾</span>
+              <strong class="text-white">Browser Storage</strong>
+              <span
+                class="text-[10px] bg-yellow-900/60 text-yellow-400 border border-yellow-700 px-2 py-0.5 rounded font-bold uppercase tracking-wide"
+                >Temporary</span
+              >
+            </div>
+            <p class="text-gray-400 text-sm leading-relaxed mb-2">
+              The editor
+              <strong class="text-white"
+                >autosaves your template to browser storage as you work</strong
+              >
+              — every time you draw, move, resize, or change a property, it
+              saves automatically. You can rename your template at any time
+              using the name field in the editor toolbar. The
+              <strong>🗂️ Files</strong> panel shows all your saved templates and
+              lets you switch between them.
+            </p>
+            <p class="text-yellow-500/90 text-sm font-semibold">
+              ⚠️ This storage can disappear without warning — clearing browser
+              data, switching browsers, using a different device, or even some
+              browser updates will wipe it completely.
+            </p>
+          </div>
+
+          <!-- Tier 2: JSON -->
+          <div class="bg-[#2a3028] rounded-lg border border-green-700/50 p-4">
+            <div class="flex items-center gap-2 mb-2">
+              <span>📁</span>
+              <strong class="text-white">JSON File Backup</strong>
+              <span
+                class="text-[10px] bg-green-900/60 text-green-400 border border-green-700 px-2 py-0.5 rounded font-bold uppercase tracking-wide"
+                >Permanent</span
+              >
+            </div>
+            <p class="text-gray-400 text-sm leading-relaxed">
+              <strong class="text-white">⬇ Backup</strong> in the editor toolbar
+              (or the <strong class="text-white">⬇ Backup</strong> button on
+              each template in the Files panel) downloads a
+              <code>.json</code> file to your computer. This is your real,
+              durable backup — it works in any browser, on any device, and
+              survives anything.
+              <strong class="text-green-400"
+                >Always download a JSON backup for any template you care about
+                keeping.</strong
+              >
+            </p>
+          </div>
+        </div>
+
+        <div class="bg-red-950/40 border border-red-700/60 rounded-lg p-4 mb-4">
+          <p class="text-sm text-red-200 leading-relaxed">
+            <strong class="text-red-400"
+              >⚠️ Don't rely on browser storage alone.</strong
+            >
+            "Saved to browser" is not the same as saved to a file. Browser
+            storage is invisible and can be cleared at any time. If you've put
+            real effort into a template,
+            <strong class="text-white"
+              >always download a <code>.json</code> backup</strong
+            >
+            — it takes one click and you'll never lose your work.
+          </p>
+        </div>
+        <div class="border-t border-[#444] my-6"></div>
+
+        <h2 class="text-xl font-bold mb-4 text-white">⌨️ Keyboard Shortcuts</h2>
+        <p class="text-gray-300 mb-4 text-sm">
+          These shortcuts work in the Template Editor.
+        </p>
+        <div class="grid grid-cols-2 gap-2 mb-2 text-sm max-w-sm">
+          <div class="flex items-center gap-2 text-gray-300">
+            <kbd
+              class="bg-[#333] border border-[#555] text-[#cf7f4b] px-2 py-0.5 rounded text-xs font-mono"
+              >R</kbd
+            >
+            Redact tool
+          </div>
+          <div class="flex items-center gap-2 text-gray-300">
+            <kbd
+              class="bg-[#333] border border-[#555] text-[#cf7f4b] px-2 py-0.5 rounded text-xs font-mono"
+              >T</kbd
+            >
+            Text tool
+          </div>
+          <div class="flex items-center gap-2 text-gray-300">
+            <kbd
+              class="bg-[#333] border border-[#555] text-[#cf7f4b] px-2 py-0.5 rounded text-xs font-mono"
+              >I</kbd
+            >
+            Image tool
+          </div>
+          <div class="flex items-center gap-2 text-gray-300">
+            <kbd
+              class="bg-[#333] border border-[#555] text-[#cf7f4b] px-2 py-0.5 rounded text-xs font-mono"
+              >Ctrl Z</kbd
+            >
+            Undo
+          </div>
+          <div class="flex items-center gap-2 text-gray-300">
+            <kbd
+              class="bg-[#333] border border-[#555] text-[#cf7f4b] px-2 py-0.5 rounded text-xs font-mono"
+              >Ctrl Y</kbd
+            >
+            Redo
+          </div>
+        </div>
+        <p class="text-gray-500 text-xs mb-4">
+          On Mac, use
+          <kbd
+            class="bg-[#333] border border-[#555] text-gray-300 px-1.5 py-0.5 rounded text-xs font-mono"
+            >⌘</kbd
+          >
+          instead of
+          <kbd
+            class="bg-[#333] border border-[#555] text-gray-300 px-1.5 py-0.5 rounded text-xs font-mono"
+            >Ctrl</kbd
+          >. Shortcuts R, T, and I are disabled while typing in text fields.
+        </p>
+
+        <div class="border-t border-[#444] my-6"></div>
+
         <p class="text-gray-400 text-sm">
           Original concept and Python script by
           <strong class="text-white">Jonathan Kung</strong> (Teacher).<br />
@@ -1108,6 +1320,114 @@
       let pendingImageSrc = null;
       let pendingImageBoxId = null;
       const EDITOR_RENDER_SCALE = 1.5;
+
+      // --- PROPERTY CHANGE DEBOUNCE ---
+      let _propChangeActive = false;
+
+      // --- UNDO / REDO ---
+      const HISTORY_LIMIT = 50;
+      let _undoStack = []; // array of serialised box snapshots
+      let _redoStack = [];
+      let _historyPaused = false; // prevents recording during undo/redo replay
+
+      function _snapshotBoxes() {
+        // Deep-clone just the boxes arrays for every page
+        return editorPageData.map((p) =>
+          p ? JSON.parse(JSON.stringify(p.boxes)) : null,
+        );
+      }
+
+      function pushHistory() {
+        if (_historyPaused) return;
+        _undoStack.push(_snapshotBoxes());
+        if (_undoStack.length > HISTORY_LIMIT) _undoStack.shift();
+        _redoStack = []; // new action clears redo
+        _updateUndoRedoBtns();
+      }
+
+      function _updateUndoRedoBtns() {
+        const u = document.getElementById("btn-undo");
+        const r = document.getElementById("btn-redo");
+        if (u) {
+          u.disabled = _undoStack.length === 0;
+          u.classList.toggle("opacity-40", _undoStack.length === 0);
+        }
+        if (r) {
+          r.disabled = _redoStack.length === 0;
+          r.classList.toggle("opacity-40", _redoStack.length === 0);
+        }
+      }
+
+      function _applySnapshot(snapshot) {
+        _historyPaused = true;
+        // Clear DOM elements
+        document.querySelectorAll(".editor-el").forEach((e) => e.remove());
+        document.querySelectorAll(".ghost-box").forEach((e) => e.remove());
+        deselectBox();
+
+        snapshot.forEach((boxes, pIdx) => {
+          if (!editorPageData[pIdx] || boxes === null) return;
+          editorPageData[pIdx].boxes = boxes;
+          const layer = document.getElementById("drawLayer-" + pIdx);
+          if (!layer) return;
+          boxes.forEach((box) => {
+            const el = createElDOM(box.type, box.x, box.y, box.w, box.h);
+            el.id = box.id;
+            if (box.type === "box") {
+              el.style.backgroundColor = box.color;
+            } else if (box.type === "text") {
+              const _fs = (box.fontSize || 16) + "px";
+              const _fc = box.textColor || "#000";
+              const _ff = getVisualFont(box);
+              const _fw = box.bold ? "bold" : "normal";
+              const _fi = box.italic ? "italic" : "normal";
+              const _fd = box.underline ? "underline" : "none";
+              el.innerHTML = `<div class="el-text-content" contenteditable="true" onfocus="if(this.innerText==='Text'){this.innerText='';}" onblur="updateTextContent(this)" style="font-size:${_fs};color:${_fc};font-family:${_ff};font-weight:${_fw};font-style:${_fi};text-decoration:${_fd}">${box.text || ""}</div>`;
+              el.style.backgroundColor = "transparent";
+              if (box.borderWidth > 0)
+                el.style.border =
+                  box.borderWidth + "px solid " + box.borderColor;
+            } else if (box.type === "image") {
+              if (box.imageSrc) {
+                el.innerHTML =
+                  '<img src="' + box.imageSrc + '" class="el-image-content">';
+                el.style.backgroundColor = "transparent";
+              } else {
+                el.innerHTML =
+                  '<div style="color:#888;font-size:10px;pointer-events:none;">Select Image...</div>';
+                el.style.backgroundColor = "rgba(0,0,0,0.1)";
+              }
+            }
+            layer.appendChild(el);
+          });
+        });
+
+        renderGhosts();
+        _historyPaused = false;
+        if (typeof scheduleAutosave === "function") scheduleAutosave();
+      }
+
+      function editorUndo() {
+        if (_undoStack.length === 0) return;
+        _redoStack.push(_snapshotBoxes());
+        const snapshot = _undoStack.pop();
+        _applySnapshot(snapshot);
+        _updateUndoRedoBtns();
+      }
+
+      function editorRedo() {
+        if (_redoStack.length === 0) return;
+        _undoStack.push(_snapshotBoxes());
+        const snapshot = _redoStack.pop();
+        _applySnapshot(snapshot);
+        _updateUndoRedoBtns();
+      }
+
+      function clearHistory() {
+        _undoStack = [];
+        _redoStack = [];
+        _updateUndoRedoBtns();
+      }
 
       // --- TABS & INIT ---
       function switchTab(tab) {
@@ -1487,6 +1807,9 @@
         document.getElementById("step1").classList.add("hidden");
         document.getElementById("editorArea").classList.remove("hidden");
         toggleLoading(false);
+        // Start a fresh autosave session for this new PDF
+        if (typeof initNewTemplateSession === "function")
+          initNewTemplateSession();
       }
 
       async function refreshEditorPages() {
@@ -1586,6 +1909,7 @@
             }
 
             const rect = layer.getBoundingClientRect();
+            pushHistory(); // snapshot before drawing new element
             startX = (e.clientX - rect.left) / currentZoom;
             startY = (e.clientY - rect.top) / currentZoom;
 
@@ -1599,6 +1923,7 @@
           if (mode) {
             const rect = layer.getBoundingClientRect();
             if (mode !== "draw") {
+              pushHistory(); // snapshot before move/resize
               startX = e.clientX;
               startY = e.clientY;
               initGeo = {
@@ -1681,6 +2006,9 @@
             const up = () => {
               window.removeEventListener("mousemove", move);
               window.removeEventListener("mouseup", up);
+              if (mode === "move" || mode === "resize") {
+                if (typeof scheduleAutosave === "function") scheduleAutosave();
+              }
               if (mode === "draw") {
                 activeEl.classList.remove("drawing");
                 const w = parseFloat(activeEl.style.width);
@@ -1751,6 +2079,7 @@
 
                 selectBox(activeEl);
                 renderGhosts();
+                if (typeof scheduleAutosave === "function") scheduleAutosave();
 
                 if (currentTool === "text") {
                   const rect = activeEl.getBoundingClientRect();
@@ -1776,8 +2105,10 @@
         const boxId = el.parentElement.id;
         const box = findBox(boxId);
         if (box) {
+          pushHistory(); // snapshot before text edit commit
           box.text = el.innerText;
           renderGhosts();
+          if (typeof scheduleAutosave === "function") scheduleAutosave();
         }
       }
 
@@ -2053,6 +2384,15 @@
       function updateElement() {
         const box = findBox(selectedBoxId);
         if (!box) return;
+        // Only push history if not already in a pending property-change group
+        if (!_propChangeActive) {
+          pushHistory();
+          _propChangeActive = true;
+          setTimeout(() => {
+            _propChangeActive = false;
+          }, 1000);
+        }
+        if (typeof scheduleAutosave === "function") scheduleAutosave();
 
         box.pattern = document.getElementById("propPattern").value;
         box.pageRange = document.getElementById("propRange").value;
@@ -2105,12 +2445,14 @@
 
       function deleteSelectedBox() {
         if (!selectedBoxId) return;
+        pushHistory(); // snapshot before delete
         editorPageData.forEach((p) => {
           if (p) p.boxes = p.boxes.filter((b) => b.id !== selectedBoxId);
         });
         document.getElementById(selectedBoxId).remove();
         deselectBox();
         renderGhosts();
+        if (typeof scheduleAutosave === "function") scheduleAutosave();
       }
 
       function deselectBox() {
@@ -2139,6 +2481,7 @@
         document.getElementById("resetModal").classList.add("hidden");
       }
       function clearAllElements() {
+        pushHistory(); // snapshot before clearing all
         editorPageData.forEach((p) => {
           if (p) p.boxes = [];
         });
@@ -2149,6 +2492,7 @@
       }
       function resetEditorState() {
         // Soft reset - just clear content
+        clearHistory();
         currentEditorPdf = null;
         editorPageData = [];
         selectedBoxId = null;
@@ -2307,9 +2651,15 @@
                   }
                 });
                 renderGhosts();
-                alert("Template Loaded! Re-save recommended.");
+                if (typeof scheduleAutosave === "function") scheduleAutosave();
               });
-            } else alert("Please upload a Reference PDF to the editor first.");
+            } else {
+              showToast(
+                "Load a reference PDF first, then load the template.",
+                "error",
+              );
+              switchTab("editor");
+            }
           } catch (err) {
             console.error(err);
             alert("Invalid Template File");
@@ -2323,6 +2673,7 @@
         const i = document.getElementById("pagesPerStudent");
         i.value = Math.max(1, parseInt(i.value) + d);
         refreshEditorPages();
+        if (typeof scheduleAutosave === "function") scheduleAutosave();
       }
       function handleZoomSlider(v) {
         currentZoom = v / 100;
@@ -2331,6 +2682,522 @@
           .querySelectorAll(".page-wrapper")
           .forEach((w) => (w.style.transform = `scale(${currentZoom})`));
       }
+    </script>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- FILES MODAL                                     -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <div
+      id="filesModal"
+      class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+    >
+      <div
+        class="bg-[#2a2a2a] border border-[#cf7f4b] rounded-xl shadow-2xl w-full max-w-lg flex flex-col"
+        style="max-height: 88vh"
+      >
+        <!-- Header -->
+        <div
+          class="flex items-center justify-between px-6 py-4 border-b border-[#444]"
+        >
+          <h2 class="text-lg font-bold text-white">🗂️ Templates</h2>
+          <button
+            onclick="closeFilesModal()"
+            class="text-gray-400 hover:text-white text-2xl leading-none"
+          >
+            &times;
+          </button>
+        </div>
+
+        <!-- ── Section A: Browser Storage ── -->
+        <div class="px-5 pt-4 pb-3 border-b border-[#444]">
+          <div class="flex items-baseline gap-2 mb-2">
+            <span
+              class="text-xs font-bold uppercase tracking-widest text-[#cf7f4b]"
+              >💾 Browser Storage</span
+            >
+            <span class="text-[10px] text-yellow-500 font-semibold"
+              >Temporary — not a backup</span
+            >
+          </div>
+          <!-- Saved list -->
+          <p class="text-[11px] text-gray-500 mt-1 mb-2 leading-snug">
+            Templates autosave as you work. Rename them using the name field in
+            the editor toolbar.
+          </p>
+          <div
+            id="fileListContainer"
+            class="overflow-y-auto mb-2"
+            style="max-height: 240px"
+          >
+            <!-- populated by JS -->
+          </div>
+        </div>
+
+        <!-- ── Section B: JSON Files ── -->
+        <div
+          class="px-5 pt-4 pb-5"
+          style="background: rgba(207, 127, 75, 0.06)"
+        >
+          <div class="flex items-baseline gap-2 mb-2">
+            <span
+              class="text-xs font-bold uppercase tracking-widest text-green-400"
+              >📁 JSON File Backup</span
+            >
+            <span class="text-[10px] text-green-500 font-semibold"
+              >Permanent — the real backup</span
+            >
+          </div>
+          <p class="text-[11px] text-gray-400 leading-snug mb-3">
+            A <code>.json</code> file saved to your computer is the only copy
+            that survives browser resets, device changes, and cleared storage.
+            Use <strong class="text-white">⬇ Backup</strong> on any template
+            below, or the toolbar button in the editor.
+          </p>
+          <div class="flex gap-2">
+            <label
+              class="tool-btn flex-1 text-sm justify-center cursor-pointer py-2 border border-green-600 text-green-400 hover:bg-green-700 hover:text-white font-semibold"
+            >
+              📂 Load from .json File
+              <input
+                type="file"
+                accept=".json"
+                class="hidden"
+                onchange="importTemplateFromFile(this)"
+              />
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div
+      id="toastContainer"
+      class="fixed bottom-6 right-6 z-[200] flex flex-col gap-2 items-end pointer-events-none"
+    ></div>
+
+    <script>
+      // ═══════════════════════════════════════════════════
+      // LOCAL STORAGE FILE MANAGER
+      // ═══════════════════════════════════════════════════
+      const LS_INDEX = "pdfprocessor_index";
+      const LS_PREFIX = "pdfprocessor_tpl_";
+
+      function lsGetIndex() {
+        try {
+          return JSON.parse(localStorage.getItem(LS_INDEX) || "[]");
+        } catch (e) {
+          return [];
+        }
+      }
+      function lsSaveIndex(idx) {
+        try {
+          localStorage.setItem(LS_INDEX, JSON.stringify(idx));
+        } catch (e) {
+          showToast(
+            "localStorage full — download JSON to free space.",
+            "error",
+          );
+        }
+      }
+      function lsGetTemplate(id) {
+        try {
+          return JSON.parse(localStorage.getItem(LS_PREFIX + id));
+        } catch (e) {
+          return null;
+        }
+      }
+      function lsSaveTemplate(id, data) {
+        try {
+          localStorage.setItem(LS_PREFIX + id, JSON.stringify(data));
+          return true;
+        } catch (e) {
+          showToast("Could not save — localStorage may be full.", "error");
+          return false;
+        }
+      }
+      function lsDeleteTemplate(id) {
+        localStorage.removeItem(LS_PREFIX + id);
+      }
+      function lsNewId() {
+        return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      }
+
+      // ── Open / Close ──
+      function openFilesModal() {
+        renderFileList();
+        document.getElementById("filesModal").classList.remove("hidden");
+      }
+      function closeFilesModal() {
+        document.getElementById("filesModal").classList.add("hidden");
+      }
+      document
+        .getElementById("filesModal")
+        .addEventListener("click", function (e) {
+          if (e.target === this) closeFilesModal();
+        });
+
+      // ── Render list ──
+      function renderFileList() {
+        const idx = lsGetIndex();
+        const container = document.getElementById("fileListContainer");
+        if (idx.length === 0) {
+          container.innerHTML = `<div class="text-center py-10 text-gray-500">
+          <div class="text-4xl mb-3">📭</div>
+          <p class="text-sm">No saved templates yet.</p>
+          <p class="text-xs mt-1">Click <strong class="text-[#cf7f4b]">Save Current Template</strong> to store one.</p>
+        </div>`;
+          return;
+        }
+        // Sort newest first
+        const sorted = [...idx].sort((a, b) => b.savedAt - a.savedAt);
+        container.innerHTML = "";
+        sorted.forEach((entry) => {
+          const row = document.createElement("div");
+          row.className =
+            "group flex items-center gap-3 px-3 py-3 rounded-lg border border-transparent hover:border-[#555] hover:bg-[#333] transition-all mb-1";
+          row.dataset.id = entry.id;
+          const date = new Date(entry.savedAt);
+          const ago = timeAgo(entry.savedAt);
+          row.innerHTML = `
+          <div class="text-2xl">📄</div>
+          <div class="flex-1 min-w-0">
+            <div class="file-name font-semibold text-white text-sm truncate" title="${escHtml(entry.name)}">${escHtml(entry.name)}</div>
+            <div class="text-xs text-gray-500 mt-0.5">${ago} · ${entry.pagesPerStudent || 1} page${(entry.pagesPerStudent || 1) > 1 ? "s" : ""}/student · ${entry.elementCount || 0} element${(entry.elementCount || 0) !== 1 ? "s" : ""}</div>
+          </div>
+          <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button title="Load into editor" onclick="loadTemplateFromLibrary('${entry.id}')" class="tool-btn text-xs px-2 py-1 text-green-400 border border-green-700 hover:bg-green-900">▶ Load</button>
+            <button title="Rename" onclick="renameTemplate('${entry.id}')" class="tool-btn text-xs px-2 py-1">✏️</button>
+            <button title="Download .json backup (permanent)" onclick="downloadTemplate('${entry.id}')" class="tool-btn text-xs px-2 py-1 text-green-400 border border-green-700 hover:bg-green-900">⬇ Backup</button>
+            <button title="Delete from browser storage" onclick="deleteTemplate('${entry.id}')" class="tool-btn text-xs px-2 py-1 text-red-400 border border-red-800 hover:bg-red-900">🗑</button>
+          </div>
+        `;
+          container.appendChild(row);
+        });
+      }
+
+      // ── Autosave engine ──
+      let _autosaveTimer = null;
+
+      // Called by every edit action — debounces and writes to localStorage
+      function scheduleAutosave() {
+        clearTimeout(_autosaveTimer);
+        _autosaveTimer = setTimeout(commitAutosave, 800);
+      }
+
+      function commitAutosave() {
+        if (!window._currentLibraryId) return;
+        const idx = lsGetIndex();
+        const entry = idx.find((e) => e.id === window._currentLibraryId);
+        if (!entry) return;
+
+        const name =
+          document.getElementById("templateNameInput")?.value?.trim() ||
+          entry.name ||
+          "Untitled Template";
+        const pps =
+          parseInt(document.getElementById("pagesPerStudent").value) || 1;
+        const boxes = editorPageData.filter((p) => p).map((p) => p.boxes);
+        const elementCount = boxes.reduce((s, b) => s + b.length, 0);
+
+        lsSaveTemplate(window._currentLibraryId, {
+          pagesPerStudent: pps,
+          boxes,
+        });
+        entry.name = name;
+        entry.savedAt = Date.now();
+        entry.pagesPerStudent = pps;
+        entry.elementCount = elementCount;
+        lsSaveIndex(idx);
+        flashAutosave();
+      }
+
+      // Called when a new PDF is loaded into the editor — creates a fresh library entry
+      function initNewTemplateSession() {
+        const id = lsNewId();
+        const name = "Untitled Template";
+        window._currentLibraryId = id;
+        const idx = lsGetIndex();
+        idx.push({
+          id,
+          name,
+          savedAt: Date.now(),
+          pagesPerStudent: 1,
+          elementCount: 0,
+        });
+        lsSaveIndex(idx);
+        const nameInput = document.getElementById("templateNameInput");
+        if (nameInput) nameInput.value = name;
+      }
+
+      // Called when user types in the name field
+      function onTemplateNameChange() {
+        scheduleAutosave();
+      }
+
+      function flashAutosave() {
+        const badge = document.getElementById("autosaveBadgeInline");
+        if (!badge) return;
+        badge.style.opacity = "1";
+        setTimeout(() => {
+          badge.style.opacity = "0";
+        }, 2500);
+      }
+
+      // ── Load from library ──
+      function loadTemplateFromLibrary(id) {
+        const tpl = lsGetTemplate(id);
+        if (!tpl) {
+          showToast("Template data not found.", "error");
+          return;
+        }
+        window._currentLibraryId = id;
+        const idx = lsGetIndex();
+        const entry = idx.find((e) => e.id === id);
+        const nameInput = document.getElementById("templateNameInput");
+        if (nameInput && entry) nameInput.value = entry.name;
+        _applyTemplateToEditor(tpl);
+        closeFilesModal();
+        showToast(
+          `"${entry?.name || "Template"}" loaded into editor`,
+          "success",
+        );
+      }
+
+      function _applyTemplateToEditor(template) {
+        if (template.pagesPerStudent)
+          document.getElementById("pagesPerStudent").value =
+            template.pagesPerStudent;
+        if (editorPageData.length > 0) {
+          document.querySelectorAll(".editor-el").forEach((el) => el.remove());
+          document.querySelectorAll(".ghost-box").forEach((el) => el.remove());
+          editorPageData.forEach((p) => {
+            if (p) p.boxes = [];
+          });
+          refreshEditorPages().then(() => {
+            template.boxes.forEach((pageBoxes, pIndex) => {
+              if (pIndex < editorPageData.length && editorPageData[pIndex]) {
+                const pageRef = editorPageData[pIndex];
+                pageBoxes.forEach((box) => {
+                  const rw = box.refWidth || 918;
+                  const rh = box.refHeight || 1188;
+                  const scaleX = pageRef.w / rw;
+                  const scaleY = pageRef.h / rh;
+                  const newBox = {
+                    ...box,
+                    x: box.x * scaleX,
+                    y: box.y * scaleY,
+                    w: box.w * scaleX,
+                    h: box.h * scaleY,
+                    fontSize: box.fontSize ? box.fontSize * scaleY : undefined,
+                    refWidth: pageRef.w,
+                    refHeight: pageRef.h,
+                  };
+                  editorPageData[pIndex].boxes.push(newBox);
+                  const layer = document.getElementById(`drawLayer-${pIndex}`);
+                  if (layer) {
+                    const el = createElDOM(
+                      box.type,
+                      newBox.x,
+                      newBox.y,
+                      newBox.w,
+                      newBox.h,
+                    );
+                    el.id = box.id;
+                    if (box.type === "box")
+                      el.style.backgroundColor = box.color;
+                    else if (box.type === "text") {
+                      el.innerHTML = `<div class="el-text-content" style="font-size:${newBox.fontSize}px; color:${box.textColor}">${box.text}</div>`;
+                      el.style.backgroundColor = "rgba(255,255,255,0.5)";
+                    } else if (box.type === "image") {
+                      el.innerHTML = `<img src="${box.imageSrc}" class="el-image-content">`;
+                      el.style.backgroundColor = "transparent";
+                    }
+                    layer.appendChild(el);
+                  }
+                });
+              }
+            });
+            renderGhosts();
+          });
+        } else {
+          showToast(
+            "Load a reference PDF first, then load the template.",
+            "error",
+          );
+          switchTab("editor");
+        }
+      }
+
+      // ── Rename ──
+      function renameTemplate(id) {
+        const idx = lsGetIndex();
+        const entry = idx.find((e) => e.id === id);
+        if (!entry) return;
+        const newName = prompt("Rename template:", entry.name);
+        if (!newName || !newName.trim()) return;
+        entry.name = newName.trim();
+        lsSaveIndex(idx);
+        renderFileList();
+        showToast("Renamed ✓", "success");
+      }
+
+      // ── Delete ──
+      function deleteTemplate(id) {
+        const idx = lsGetIndex();
+        const entry = idx.find((e) => e.id === id);
+        if (!entry) return;
+        if (!confirm(`Delete "${entry.name}"? This cannot be undone.`)) return;
+        lsDeleteTemplate(id);
+        lsSaveIndex(idx.filter((e) => e.id !== id));
+        if (window._currentLibraryId === id) window._currentLibraryId = null;
+        renderFileList();
+        showToast("Deleted.", "info");
+      }
+
+      // ── Download individual template as .json backup ──
+      function downloadTemplate(id) {
+        const tpl = lsGetTemplate(id);
+        const idx = lsGetIndex();
+        const entry = idx.find((e) => e.id === id);
+        if (!tpl) return;
+        const blob = new Blob([JSON.stringify(tpl, null, 2)], {
+          type: "application/json",
+        });
+        saveAs(
+          blob,
+          (entry?.name || "template").replace(/[^a-z0-9]/gi, "_") + ".json",
+        );
+        showToast(`"${entry?.name}" backed up ✓`, "success");
+      }
+
+      // ── Import from file ──
+      function importTemplateFromFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const tpl = JSON.parse(e.target.result);
+            if (!tpl.boxes) {
+              showToast("Invalid template file.", "error");
+              return;
+            }
+            const name =
+              file.name.replace(/\.json$/i, "").replace(/_/g, " ") ||
+              "Imported Template";
+            const id = lsNewId();
+            const pps = tpl.pagesPerStudent || 1;
+            const elementCount = (tpl.boxes || []).reduce(
+              (s, b) => s + b.length,
+              0,
+            );
+            if (!lsSaveTemplate(id, tpl)) return;
+            const idx = lsGetIndex();
+            idx.push({
+              id,
+              name,
+              savedAt: Date.now(),
+              pagesPerStudent: pps,
+              elementCount,
+            });
+            lsSaveIndex(idx);
+            window._currentLibraryId = id;
+            const nameInput = document.getElementById("templateNameInput");
+            if (nameInput) nameInput.value = name;
+            renderFileList();
+            showToast(`"${name}" imported ✓`, "success");
+          } catch (err) {
+            showToast("Could not parse JSON file.", "error");
+          }
+        };
+        reader.readAsText(file);
+        input.value = "";
+      }
+
+      // ── Toast ──
+      function showToast(msg, type = "info") {
+        const c = document.getElementById("toastContainer");
+        const t = document.createElement("div");
+        const colors = {
+          success: "bg-green-800 border-green-600",
+          error: "bg-red-900 border-red-600",
+          info: "bg-[#2a2a2a] border-[#555]",
+        };
+        t.className = `pointer-events-auto px-4 py-2.5 rounded-lg border text-sm text-white shadow-xl transform translate-x-4 opacity-0 transition-all duration-300 ${colors[type] || colors.info}`;
+        t.textContent = msg;
+        c.appendChild(t);
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            t.style.transform = "translateX(0)";
+            t.style.opacity = "1";
+          }),
+        );
+        setTimeout(() => {
+          t.style.opacity = "0";
+          t.style.transform = "translateX(16px)";
+          setTimeout(() => t.remove(), 300);
+        }, 3000);
+      }
+
+      // ── Utils ──
+      function escHtml(s) {
+        return (s || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+      function timeAgo(ts) {
+        const d = Date.now() - ts;
+        if (d < 60000) return "just now";
+        if (d < 3600000) return Math.floor(d / 60000) + "m ago";
+        if (d < 86400000) return Math.floor(d / 3600000) + "h ago";
+        if (d < 86400000 * 30) return Math.floor(d / 86400000) + "d ago";
+        return new Date(ts).toLocaleDateString();
+      }
+
+      // ── Keyboard shortcuts ──
+      document.addEventListener("keydown", function (e) {
+        // Don't fire if typing in an input/textarea/contenteditable
+        const tag = document.activeElement?.tagName?.toLowerCase();
+        const isEditing =
+          tag === "input" ||
+          tag === "textarea" ||
+          document.activeElement?.isContentEditable;
+
+        // Ctrl/Cmd+Z — Undo
+        if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+          e.preventDefault();
+          editorUndo();
+          return;
+        }
+        // Ctrl/Cmd+Y — Redo
+        if (
+          (e.ctrlKey || e.metaKey) &&
+          (e.key === "y" || (e.key === "z" && e.shiftKey))
+        ) {
+          e.preventDefault();
+          editorRedo();
+          return;
+        }
+
+        if (isEditing) return; // don't intercept letter keys while editing text
+
+        // Only activate tool shortcuts when Template Editor tab is active
+        if (currentTab !== "editor") return;
+
+        if (e.key === "r" || e.key === "R") {
+          setTool("box");
+        } else if (e.key === "t" || e.key === "T") {
+          setTool("text");
+        } else if (e.key === "i" || e.key === "I") {
+          setTool("image");
+        }
+      });
+
+      // ── Patch: auto-save to library when Save button is clicked ──
+      // (autosaveToLibrary is called directly from saveTemplateFromEditor below)
     </script>
   </body>
 </html>
