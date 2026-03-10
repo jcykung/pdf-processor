@@ -1599,19 +1599,23 @@
 
             for (let tRelIndex = 0; tRelIndex < loadedBatchTemplate.boxes.length; tRelIndex++) {
               const pageBoxes = loadedBatchTemplate.boxes[tRelIndex];
-              // tRelIndex is the student-relative page the element was drawn on (its anchor)
-              const anchorPage = tRelIndex % pagesPerStudent;
+              // anchorPage = the template page this element was drawn on (0-based)
+              // If the template was built with more pages than this document has per student,
+              // elements on those extra pages are simply skipped.
+              const anchorPage = tRelIndex;
 
               for (const box of pageBoxes) {
                 let apply = false;
                 if (box.pattern === "student") {
-                  // Only on the exact page it was drawn on
-                  apply = (relIndex === anchorPage);
+                  // Apply only to the exact matching page in each student's block.
+                  // If anchor is beyond this doc's page count, skip entirely.
+                  apply = (anchorPage < pagesPerStudent) && (relIndex === anchorPage);
                 } else if (box.pattern === "rest") {
-                  // On the anchor page AND every page after it within this student's block
-                  apply = (relIndex >= anchorPage);
+                  // Apply from the anchor page onwards within each student's block.
+                  // If anchor is beyond this doc's page count, never applies.
+                  apply = (anchorPage < pagesPerStudent) && (relIndex >= anchorPage);
                 } else if (box.pattern === "all") {
-                  // Every single page in the PDF
+                  // Every single page regardless of student grouping.
                   apply = true;
                 } else if (box.pattern === "range") {
                   apply = isPageInRange(relIndex, box.pageRange);
