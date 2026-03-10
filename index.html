@@ -609,7 +609,7 @@
         <div id="batchTemplateStatus" class="mt-3 text-xs font-mono text-[#cf7f4b] min-h-[16px]"></div>
       </div>
 
-      <!-- 2. Set Page Count -->
+      <!-- 2. Pages per student -->
       <div class="glass-card p-6 rounded-2xl text-center flex flex-col items-center shadow-xl">
         <div
           class="mb-3 flex items-center justify-center w-12 h-12 rounded-xl bg-[#cf7f4b]/15 border border-[#cf7f4b]/30">
@@ -624,8 +624,8 @@
               d="m6.08 14.5-3.5 1.6a1 1 0 0 0 0 1.81l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9a1 1 0 0 0 0-1.83l-3.5-1.59" />
           </svg>
         </div>
-        <h2 class="text-lg font-semibold mb-0.5 tracking-tight">2. Set Page Count</h2>
-        <p class="text-xs text-gray-500 mb-5 font-mono">Pages per single student report</p>
+        <h2 class="text-lg font-semibold mb-0.5 tracking-tight">2. Pages Per Student</h2>
+        <p class="text-xs text-gray-500 mb-5 font-mono">How many pages is one student's report?</p>
 
         <div class="flex items-center justify-center gap-3 mb-2 w-full">
           <button onclick="adjustBatchPages(-1)"
@@ -648,7 +648,7 @@
             </svg>
           </button>
         </div>
-        <p class="text-xs text-gray-600 mt-2 font-mono">Verify against your PDF document.</p>
+        <p class="text-xs text-gray-600 mt-2 font-mono">e.g. if your PDF has 30 pages for 10 students, enter 3.</p>
       </div>
 
       <!-- 3. PDF Upload & Run -->
@@ -1537,15 +1537,22 @@
       await processPdfs(files);
     }
 
+    // Holds processed results waiting for preview approval
+    let _previewResults = []; // [{name, blob, pdfBytes}]
+    let _previewIndex = 0;    // which document we're previewing
+    let _previewPageIndex = 0; // which page within that document
+    let _previewPdfCache = {}; // index -> pdfjsLib doc
+
     async function processPdfs(files) {
-      toggleLoading(true, "Processing...");
+      toggleLoading(true, "Processing…");
       const pagesPerStudent =
         parseInt(document.getElementById("batchPagesPerStudent").value) || 1;
+
+      const results = [];
 
       try {
         let processedCount = 0;
 
-        // Process files sequentially
         for (const file of files) {
           if (file.type !== "application/pdf") continue;
 
@@ -1556,37 +1563,17 @@
           // Embed Fonts
           const fonts = {
             Helvetica: await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica),
-            "Helvetica-Bold": await pdfDoc.embedFont(
-              PDFLib.StandardFonts.HelveticaBold,
-            ),
-            "Helvetica-Oblique": await pdfDoc.embedFont(
-              PDFLib.StandardFonts.HelveticaOblique,
-            ),
-            "Helvetica-BoldOblique": await pdfDoc.embedFont(
-              PDFLib.StandardFonts.HelveticaBoldOblique,
-            ),
-            "Times-Roman": await pdfDoc.embedFont(
-              PDFLib.StandardFonts.TimesRoman,
-            ),
-            "Times-Bold": await pdfDoc.embedFont(
-              PDFLib.StandardFonts.TimesRomanBold,
-            ),
-            "Times-Italic": await pdfDoc.embedFont(
-              PDFLib.StandardFonts.TimesRomanItalic,
-            ),
-            "Times-BoldItalic": await pdfDoc.embedFont(
-              PDFLib.StandardFonts.TimesRomanBoldItalic,
-            ),
+            "Helvetica-Bold": await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold),
+            "Helvetica-Oblique": await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaOblique),
+            "Helvetica-BoldOblique": await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBoldOblique),
+            "Times-Roman": await pdfDoc.embedFont(PDFLib.StandardFonts.TimesRoman),
+            "Times-Bold": await pdfDoc.embedFont(PDFLib.StandardFonts.TimesRomanBold),
+            "Times-Italic": await pdfDoc.embedFont(PDFLib.StandardFonts.TimesRomanItalic),
+            "Times-BoldItalic": await pdfDoc.embedFont(PDFLib.StandardFonts.TimesRomanBoldItalic),
             Courier: await pdfDoc.embedFont(PDFLib.StandardFonts.Courier),
-            "Courier-Bold": await pdfDoc.embedFont(
-              PDFLib.StandardFonts.CourierBold,
-            ),
-            "Courier-Oblique": await pdfDoc.embedFont(
-              PDFLib.StandardFonts.CourierOblique,
-            ),
-            "Courier-BoldOblique": await pdfDoc.embedFont(
-              PDFLib.StandardFonts.CourierBoldOblique,
-            ),
+            "Courier-Bold": await pdfDoc.embedFont(PDFLib.StandardFonts.CourierBold),
+            "Courier-Oblique": await pdfDoc.embedFont(PDFLib.StandardFonts.CourierOblique),
+            "Courier-BoldOblique": await pdfDoc.embedFont(PDFLib.StandardFonts.CourierBoldOblique),
           };
 
           const imageCache = {};
@@ -1594,28 +1581,19 @@
           for (let pIndex = 0; pIndex < pages.length; pIndex++) {
             const page = pages[pIndex];
             const { width, height } = page.getSize();
-            // Which page within this student's block (0-based)
             const relIndex = pIndex % pagesPerStudent;
 
             for (let tRelIndex = 0; tRelIndex < loadedBatchTemplate.boxes.length; tRelIndex++) {
               const pageBoxes = loadedBatchTemplate.boxes[tRelIndex];
-              // anchorPage = the template page this element was drawn on (0-based)
-              // If the template was built with more pages than this document has per student,
-              // elements on those extra pages are simply skipped.
               const anchorPage = tRelIndex;
 
               for (const box of pageBoxes) {
                 let apply = false;
                 if (box.pattern === "student") {
-                  // Apply only to the exact matching page in each student's block.
-                  // If anchor is beyond this doc's page count, skip entirely.
                   apply = (anchorPage < pagesPerStudent) && (relIndex === anchorPage);
                 } else if (box.pattern === "rest") {
-                  // Apply from the anchor page onwards within each student's block.
-                  // If anchor is beyond this doc's page count, never applies.
                   apply = (anchorPage < pagesPerStudent) && (relIndex >= anchorPage);
                 } else if (box.pattern === "all") {
-                  // Every single page regardless of student grouping.
                   apply = true;
                 } else if (box.pattern === "range") {
                   apply = isPageInRange(relIndex, box.pageRange);
@@ -1626,7 +1604,6 @@
                   const rh = box.refHeight || 792;
                   const sx = width / rw;
                   const sy = height / rh;
-
                   const x = box.x * sx;
                   const w = box.w * sx;
                   const h = box.h * sy;
@@ -1634,122 +1611,46 @@
 
                   if (box.type === "box") {
                     const c = hexToRgb(box.color || "#000000");
-                    page.drawRectangle({
-                      x,
-                      y,
-                      width: w,
-                      height: h,
-                      color: PDFLib.rgb(c.r, c.g, c.b),
-                    });
+                    page.drawRectangle({ x, y, width: w, height: h, color: PDFLib.rgb(c.r, c.g, c.b) });
                   } else if (box.type === "text") {
                     const fontSize = (box.fontSize || 12) * sy;
                     const c = hexToRgb(box.textColor || "#000000");
-
-                    // Determine Font
                     let fontName = box.fontFamily || "Helvetica";
-                    if (box.bold && box.italic)
-                      fontName +=
-                        fontName === "Times-Roman"
-                          ? "BoldItalic"
-                          : "-BoldOblique";
-                    else if (box.bold)
-                      fontName +=
-                        fontName === "Times-Roman" ? "Bold" : "-Bold";
-                    else if (box.italic)
-                      fontName +=
-                        fontName === "Times-Roman" ? "Italic" : "-Oblique";
-
-                    if (fontName === "Courier-Bold-Oblique")
-                      fontName = "Courier-BoldOblique";
-                    if (fontName === "Helvetica-Bold-Oblique")
-                      fontName = "Helvetica-BoldOblique";
-
-                    const selectedFont =
-                      fonts[fontName] || fonts["Helvetica"];
-
-                    // Draw Box Border if set
+                    if (box.bold && box.italic) fontName += fontName === "Times-Roman" ? "BoldItalic" : "-BoldOblique";
+                    else if (box.bold) fontName += fontName === "Times-Roman" ? "Bold" : "-Bold";
+                    else if (box.italic) fontName += fontName === "Times-Roman" ? "Italic" : "-Oblique";
+                    if (fontName === "Courier-Bold-Oblique") fontName = "Courier-BoldOblique";
+                    if (fontName === "Helvetica-Bold-Oblique") fontName = "Helvetica-BoldOblique";
+                    const selectedFont = fonts[fontName] || fonts["Helvetica"];
                     if (box.borderWidth > 0) {
                       const bc = hexToRgb(box.borderColor || "#000000");
-                      page.drawRectangle({
-                        x: x,
-                        y: y,
-                        width: w,
-                        height: h,
-                        borderColor: PDFLib.rgb(bc.r, bc.g, bc.b),
-                        borderWidth: box.borderWidth * sx,
-                        color: undefined,
-                      });
+                      page.drawRectangle({ x, y, width: w, height: h, borderColor: PDFLib.rgb(bc.r, bc.g, bc.b), borderWidth: box.borderWidth * sx, color: undefined });
                     }
-
-                    // Draw Shadow
                     if (box.shadow) {
-                      const textWidth = selectedFont.widthOfTextAtSize(
-                        box.text || "",
-                        fontSize,
-                      );
-                      const drawX = x + (w - textWidth) / 2 + 4;
-                      const drawY = y + h / 2 - fontSize / 3 - 4;
-                      page.drawText(box.text || "", {
-                        x: drawX,
-                        y: drawY,
-                        size: fontSize,
-                        font: selectedFont,
-                        color: PDFLib.rgb(0.5, 0.5, 0.5),
-                        opacity: 0.5,
-                      });
+                      const tw = selectedFont.widthOfTextAtSize(box.text || "", fontSize);
+                      page.drawText(box.text || "", { x: x + (w - tw) / 2 + 4, y: y + h / 2 - fontSize / 3 - 4, size: fontSize, font: selectedFont, color: PDFLib.rgb(0.5, 0.5, 0.5), opacity: 0.5 });
                     }
-
-                    const textWidth = selectedFont.widthOfTextAtSize(
-                      box.text || "",
-                      fontSize,
-                    );
-                    const drawX = x + (w - textWidth) / 2;
+                    const tw = selectedFont.widthOfTextAtSize(box.text || "", fontSize);
+                    const drawX = x + (w - tw) / 2;
                     const drawY = y + h / 2 - fontSize / 3;
-
-                    page.drawText(box.text || "", {
-                      x: drawX,
-                      y: drawY,
-                      size: fontSize,
-                      font: selectedFont,
-                      color: PDFLib.rgb(c.r, c.g, c.b),
-                    });
-
+                    page.drawText(box.text || "", { x: drawX, y: drawY, size: fontSize, font: selectedFont, color: PDFLib.rgb(c.r, c.g, c.b) });
                     if (box.underline) {
-                      page.drawLine({
-                        start: { x: drawX, y: drawY - 2 },
-                        end: { x: drawX + textWidth, y: drawY - 2 },
-                        thickness: 1,
-                        color: PDFLib.rgb(c.r, c.g, c.b),
-                      });
+                      page.drawLine({ start: { x: drawX, y: drawY - 2 }, end: { x: drawX + tw, y: drawY - 2 }, thickness: 1, color: PDFLib.rgb(c.r, c.g, c.b) });
                     }
                   } else if (box.type === "image" && box.imageSrc) {
                     let img = imageCache[box.id];
                     if (!img) {
-                      if (box.imageSrc.startsWith("data:image/png"))
-                        img = await pdfDoc.embedPng(box.imageSrc);
+                      if (box.imageSrc.startsWith("data:image/png")) img = await pdfDoc.embedPng(box.imageSrc);
                       else img = await pdfDoc.embedJpg(box.imageSrc);
                       imageCache[box.id] = img;
                     }
                     const dims = img.scale(1);
                     const imgRatio = dims.width / dims.height;
                     const boxRatio = w / h;
-                    let drawW = w,
-                      drawH = h,
-                      drawX = x,
-                      drawY = y;
-                    if (imgRatio > boxRatio) {
-                      drawH = w / imgRatio;
-                      drawY = y + (h - drawH) / 2;
-                    } else {
-                      drawW = h * imgRatio;
-                      drawX = x + (w - drawW) / 2;
-                    }
-                    page.drawImage(img, {
-                      x: drawX,
-                      y: drawY,
-                      width: drawW,
-                      height: drawH,
-                    });
+                    let drawW = w, drawH = h, drawX = x, drawY = y;
+                    if (imgRatio > boxRatio) { drawH = w / imgRatio; drawY = y + (h - drawH) / 2; }
+                    else { drawW = h * imgRatio; drawX = x + (w - drawW) / 2; }
+                    page.drawImage(img, { x: drawX, y: drawY, width: drawW, height: drawH });
                   }
                 }
               }
@@ -1757,23 +1658,140 @@
           }
 
           const pdfBytes = await pdfDoc.save();
-          const newName = file.name.replace(".pdf", " PROCESSED.pdf");
+          const newName = file.name.replace(/\.pdf$/i, " PROCESSED.pdf");
           const blob = new Blob([pdfBytes], { type: "application/pdf" });
-          saveAs(blob, newName);
+          results.push({ name: newName, blob, pdfBytes });
 
           processedCount++;
-          document.getElementById("batchRunStatus").innerText =
-            `Processed ${processedCount}/${files.length}`;
-
-          await new Promise((r) => setTimeout(r, 500));
+          document.getElementById("batchRunStatus").innerText = `Processed ${processedCount}/${files.length}`;
         }
-        document.getElementById("batchRunStatus").innerText = "Done!";
+
+        document.getElementById("batchRunStatus").innerText = `${results.length} file(s) ready — check preview`;
+        toggleLoading(false);
+        openPreview(results);
+
       } catch (e) {
         console.error(e);
         alert("Error processing files: " + e.message);
-      } finally {
         toggleLoading(false);
       }
+    }
+
+    // ── Preview functions ──
+    function openPreview(results) {
+      _previewResults = results;
+      _previewPdfCache = {};
+      _previewIndex = 0;
+      _previewPageIndex = 0;
+      document.getElementById("previewModal").classList.remove("hidden");
+      renderPreviewDoc(0, 0);
+    }
+
+    function closePreview() {
+      document.getElementById("previewModal").classList.add("hidden");
+      _previewResults = [];
+      _previewPdfCache = {};
+      document.getElementById("batchRunStatus").innerText = "Cancelled.";
+    }
+
+    function previewNav(dir) {
+      _previewIndex = Math.max(0, Math.min(_previewResults.length - 1, _previewIndex + dir));
+      _previewPageIndex = 0;
+      renderPreviewDoc(_previewIndex, 0);
+    }
+
+    function previewPageNav(dir) {
+      const cached = _previewPdfCache[_previewIndex];
+      if (!cached) return;
+      const newPage = Math.max(0, Math.min(cached.numPages - 1, _previewPageIndex + dir));
+      _previewPageIndex = newPage;
+      renderPreviewPage(cached, newPage);
+      updatePreviewUI();
+    }
+
+    async function renderPreviewDoc(docIndex, pageIndex) {
+      const area = document.getElementById("previewCanvasArea");
+      area.innerHTML = '<p class="text-gray-500 text-sm">Rendering…</p>';
+      updatePreviewUI();
+
+      try {
+        let pdfJsDoc = _previewPdfCache[docIndex];
+        if (!pdfJsDoc) {
+          const bytes = _previewResults[docIndex].pdfBytes;
+          pdfJsDoc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+          _previewPdfCache[docIndex] = pdfJsDoc;
+        }
+        _previewPageIndex = Math.max(0, Math.min(pdfJsDoc.numPages - 1, pageIndex));
+        renderPreviewPage(pdfJsDoc, _previewPageIndex);
+        updatePreviewUI();
+      } catch (e) {
+        area.innerHTML = `<p class="text-red-400 text-sm">Could not render preview: ${e.message}</p>`;
+      }
+    }
+
+    async function renderPreviewPage(pdfJsDoc, pageIndex) {
+      const area = document.getElementById("previewCanvasArea");
+      area.innerHTML = '';
+      try {
+        const page = await pdfJsDoc.getPage(pageIndex + 1);
+        const maxW = area.clientWidth - 32;
+        const unscaledVp = page.getViewport({ scale: 1 });
+        const scale = Math.min(2, maxW / unscaledVp.width);
+        const vp = page.getViewport({ scale });
+
+        const canvas = document.createElement("canvas");
+        canvas.width = vp.width;
+        canvas.height = vp.height;
+        canvas.style.maxWidth = "100%";
+        canvas.style.borderRadius = "4px";
+        canvas.style.boxShadow = "0 4px 20px rgba(0,0,0,0.6)";
+        area.appendChild(canvas);
+
+        await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+        updatePreviewUI();
+      } catch (e) {
+        area.innerHTML = `<p class="text-red-400 text-sm">Render error: ${e.message}</p>`;
+      }
+    }
+
+    function updatePreviewUI() {
+      const total = _previewResults.length;
+      const cur = _previewResults[_previewIndex];
+      const pdfJsDoc = _previewPdfCache[_previewIndex];
+      const totalPages = pdfJsDoc ? pdfJsDoc.numPages : '?';
+
+      document.getElementById("previewSubtitle").textContent = cur ? cur.name : '';
+      document.getElementById("previewCounter").textContent = total > 1 ? `${_previewIndex + 1} / ${total}` : '';
+      document.getElementById("previewPageCounter").textContent = `Page ${_previewPageIndex + 1} of ${totalPages}`;
+
+      const prevBtn = document.getElementById("previewPrevBtn");
+      const nextBtn = document.getElementById("previewNextBtn");
+      prevBtn.disabled = _previewIndex === 0;
+      nextBtn.disabled = _previewIndex >= total - 1;
+      prevBtn.classList.toggle("opacity-30", prevBtn.disabled);
+      nextBtn.classList.toggle("opacity-30", nextBtn.disabled);
+
+      // Hide doc nav if only one file
+      document.getElementById("previewPrevBtn").style.display = total > 1 ? '' : 'none';
+      document.getElementById("previewNextBtn").style.display = total > 1 ? '' : 'none';
+      document.getElementById("previewCounter").style.display = total > 1 ? '' : 'none';
+
+      // Update download this one button label
+      const dlBtn = document.querySelector("[onclick='downloadCurrentPreview()']");
+      if (dlBtn) dlBtn.style.display = total > 1 ? '' : 'none';
+    }
+
+    function downloadCurrentPreview() {
+      const r = _previewResults[_previewIndex];
+      if (r) saveAs(r.blob, r.name);
+    }
+
+    function downloadAllPreviews() {
+      _previewResults.forEach(r => saveAs(r.blob, r.name));
+      document.getElementById("previewModal").classList.add("hidden");
+      document.getElementById("batchRunStatus").innerText = `Downloaded ${_previewResults.length} file(s) ✓`;
+      _previewResults = [];
+      _previewPdfCache = {};
     }
 
     // --- EDITOR LOGIC ---
@@ -2818,6 +2836,57 @@
           📂 Restore .json
           <input type="file" accept=".json" class="hidden" onchange="importTemplateFromFile(this)" />
         </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- PDF Preview Modal -->
+  <div id="previewModal"
+    class="hidden fixed inset-0 z-[90] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+    <div class="bg-[#1e1e1e] border border-[#cf7f4b]/60 rounded-xl shadow-2xl flex flex-col"
+      style="width: min(95vw, 780px); max-height: 92vh;">
+
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 py-3 border-b border-[#333] flex-shrink-0">
+        <div>
+          <h2 class="text-base font-bold text-white">Preview Processed PDFs</h2>
+          <p id="previewSubtitle" class="text-xs text-gray-400 mt-0.5"></p>
+        </div>
+        <div class="flex items-center gap-2">
+          <!-- Prev / Next doc -->
+          <button id="previewPrevBtn" onclick="previewNav(-1)" class="tool-btn text-xs px-2.5 py-1 disabled:opacity-30"
+            disabled>◀ Prev</button>
+          <span id="previewCounter" class="text-xs font-mono text-[#cf7f4b] min-w-[60px] text-center"></span>
+          <button id="previewNextBtn" onclick="previewNav(1)" class="tool-btn text-xs px-2.5 py-1 disabled:opacity-30"
+            disabled>Next ▶</button>
+        </div>
+      </div>
+
+      <!-- Page canvas area -->
+      <div class="flex-1 overflow-auto flex flex-col items-center gap-3 p-4 bg-[#2a2a2a]" id="previewCanvasArea">
+        <p class="text-gray-500 text-sm">Rendering…</p>
+      </div>
+
+      <!-- Page nav within a doc -->
+      <div id="previewPageNav" class="flex items-center justify-center gap-3 py-2 border-t border-[#333] flex-shrink-0">
+        <button onclick="previewPageNav(-1)" class="tool-btn text-xs px-2 py-1">◀ Page</button>
+        <span id="previewPageCounter" class="text-xs font-mono text-gray-400"></span>
+        <button onclick="previewPageNav(1)" class="tool-btn text-xs px-2 py-1">Page ▶</button>
+      </div>
+
+      <!-- Footer actions -->
+      <div class="flex items-center justify-between gap-3 px-5 py-3 border-t border-[#333] flex-shrink-0">
+        <button onclick="closePreview()" class="text-sm text-gray-400 hover:text-red-400 transition-colors">✕ Cancel —
+          don't download</button>
+        <div class="flex gap-2">
+          <button onclick="downloadCurrentPreview()"
+            class="tool-btn text-sm px-4 py-1.5 border border-green-600 text-green-400 hover:bg-green-900">
+            ⬇ Download This One
+          </button>
+          <button onclick="downloadAllPreviews()" class="btn-primary text-sm px-4 py-1.5">
+            ⬇ Download All
+          </button>
+        </div>
       </div>
     </div>
   </div>
