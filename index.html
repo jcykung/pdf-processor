@@ -617,11 +617,27 @@
           </div>
 
           <!-- Empty state -->
-          <div id="templateSelectorEmpty" class="hidden w-full py-6 text-center">
+          <div id="templateSelectorEmpty" class="hidden w-full py-4 text-center">
             <p class="text-xs text-gray-500 mb-2">No saved templates yet.</p>
-            <button onclick="switchTab('editor')"
+            <button onclick="newTemplate(); switchTab('editor');"
               class="text-xs text-[#cf7f4b] hover:text-white underline underline-offset-2">
               Create one in Template Editor →
+            </button>
+          </div>
+
+          <!-- New Template button -->
+          <div class="w-full mt-3">
+            <button onclick="newTemplate(); switchTab('editor');"
+              class="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-[#cf7f4b]/40 text-[#cf7f4b] hover:bg-[#cf7f4b]/10 hover:border-[#cf7f4b]/70 transition-all text-xs font-semibold">
+              <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                style="display:inline-block;vertical-align:-0.15em;font-size:1rem;">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="12" y1="13" x2="12" y2="19" />
+                <line x1="9" y1="16" x2="15" y2="16" />
+              </svg>
+              New Template
             </button>
           </div>
 
@@ -875,10 +891,24 @@
           <!-- Spacer -->
           <div class="flex-1"></div>
 
-          <!-- Template name + Save -->
+          <!-- Template name + Save + New -->
           <div class="flex items-center gap-2">
+            <!-- New button -->
+            <button onclick="newTemplate()" title="Discard current work and start a brand-new template"
+              class="tool-btn text-xs px-3 py-1 border border-[#555] text-gray-300 hover:text-white hover:border-[#888]">
+              <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                style="display:inline-block;vertical-align:-0.15em;font-size:0.85rem;">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="12" y1="13" x2="12" y2="19" />
+                <line x1="9" y1="16" x2="15" y2="16" />
+              </svg>
+              New
+            </button>
+            <div class="h-5 w-px bg-white/20"></div>
             <input type="text" id="templateNameInput" placeholder="Name this template…"
-              class="input-dark text-xs px-2 py-1 text-left font-normal w-44" oninput="onTemplateNameChange()" />
+              class="input-dark text-xs px-2 py-1 text-left font-normal w-44" />
             <button onclick="saveTemplateToLibrary()" title="Save template to your library"
               class="tool-btn text-xs px-3 py-1 bg-[#cf7f4b] text-[#1a1a1a] font-bold hover:bg-[#e89560] border-0">
               <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none"
@@ -1183,7 +1213,8 @@
                 <p class="text-gray-400 text-sm leading-relaxed">Type a name in the toolbar field (e.g. "Grade 9 Reports
                   2025") and click <strong class="text-white">Save</strong>. The template is stored in your browser. Use
                   <strong class="text-white">⬇ Backup All</strong> (bottom of the left sidebar) regularly to download a
-                  backup file — see the warning below.
+                  backup file — see the warning below. To start a new blank template at any time, click the <strong
+                    class="text-white">New</strong> button in the toolbar.
                 </p>
               </div>
             </div>
@@ -1222,9 +1253,11 @@
               <li><strong class="text-white">🗑 Delete</strong> — hover a template row and click the bin icon to
                 permanently remove it.</li>
             </ul>
-            <p class="mt-2">To <strong class="text-white">edit a template's overlays</strong>, go to Template Editor,
-              upload a reference PDF, then type the template name and click Save — the autosave system will keep it
-              updated as you make changes.</p>
+            <p class="mt-2">To <strong class="text-white">edit a template's overlays</strong>, hover a template row on
+              the PDF Processor tab and click <strong class="text-white">Edit</strong>. This takes you directly to the
+              Template Editor with that template loaded — upload a reference PDF to see and move the overlays, then
+              click <strong class="text-white">Save</strong> when done. Changes are <em>not</em> saved until you click
+              Save.</p>
           </div>
         </div>
 
@@ -1336,11 +1369,11 @@
             </div>
 
             <div>
-              <h3 class="text-sm font-bold text-white mb-1">Autosave</h3>
-              <p class="text-gray-400 text-sm leading-relaxed">While editing a named template, changes are saved
-                automatically to browser storage after a short delay. You'll see a "● Saved" flash in the toolbar. This
-                does <em>not</em> write a backup file — use <strong class="text-white">⬇ Backup All</strong> (bottom of
-                the left sidebar) for that.</p>
+              <h3 class="text-sm font-bold text-white mb-1">Manual Save</h3>
+              <p class="text-gray-400 text-sm leading-relaxed">Templates are <strong class="text-white">only saved when
+                  you click Save</strong>. There is no autosave. After making changes, always click Save in the toolbar
+                — you'll see a "● Saved" flash to confirm. Use the <strong class="text-white">New</strong> button to
+                discard current work and start fresh.</p>
             </div>
 
           </div>
@@ -1747,6 +1780,13 @@
           renameBtn.textContent = "✏️";
           renameBtn.addEventListener("click", (e) => { e.stopPropagation(); renameTemplate(entry.id); });
 
+          // 🖊 Edit overlays button
+          const editBtn = document.createElement("button");
+          editBtn.title = "Edit this template's overlays in Template Editor";
+          editBtn.className = "flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-[#cf7f4b]/60 text-[#cf7f4b] hover:bg-[#cf7f4b]/20 transition-colors opacity-0 group-hover:opacity-100";
+          editBtn.textContent = "Edit";
+          editBtn.addEventListener("click", (e) => { e.stopPropagation(); editTemplateFromLibrary(entry.id); });
+
           // 🗑 Delete button
           const delBtn = document.createElement("button");
           delBtn.title = "Delete this template";
@@ -1757,6 +1797,7 @@
           item.appendChild(favBtn);
           item.appendChild(nameWrap);
           item.appendChild(renameBtn);
+          item.appendChild(editBtn);
           item.appendChild(delBtn);
 
           // Click row to select template
@@ -2163,11 +2204,11 @@
         if (window._pendingTemplateLoad) {
           _applyTemplateToEditor(window._pendingTemplateLoad);
           window._pendingTemplateLoad = null;
-        } else if (typeof initNewTemplateSession === "function") {
-          // Fresh PDF — don't auto-create a library entry; wait for explicit Save
+        } else {
+          // Fresh PDF with no pending template — start blank, user saves manually
           window._currentLibraryId = null;
           const nameInput = document.getElementById("templateNameInput");
-          if (nameInput) nameInput.value = "";
+          if (nameInput && !nameInput.value.trim()) nameInput.value = "";
         }
       }
 
@@ -2873,6 +2914,21 @@
         closeResetModal();
       }
 
+      // ── New Template — clear session without saving ──
+      function newTemplate() {
+        const hasWork = editorPageData.some(p => p && p.boxes.length > 0);
+        const hasName = document.getElementById("templateNameInput")?.value?.trim();
+        if (hasWork || hasName) {
+          if (!confirm("Start a new template? Any unsaved changes will be lost.")) return;
+        }
+        window._currentLibraryId = null;
+        const nameInput = document.getElementById("templateNameInput");
+        if (nameInput) nameInput.value = "";
+        window._pendingTemplateLoad = null;
+        resetEditorState();
+        showToast("New template started — upload a reference PDF to begin.", "info");
+      }
+
       // --- UTILS ---
       function getDominantColor(ctx, x, y, w, h) {
         try {
@@ -3313,12 +3369,12 @@
         if (editorPageData.length > 0) {
           _applyTemplateToEditor(tpl);
           switchTab("editor");
-          showToast(`"${entry?.name}" loaded for editing`, "success");
+          showToast(`"${entry?.name}" loaded — upload a new reference PDF or edit overlays directly.`, "info");
         } else {
-          // Switch to editor tab and show start screen with a pending load message
+          // Switch to editor tab — user needs to upload a reference PDF first
           switchTab("editor");
-          showToast(`Upload a reference PDF, then your template "${entry?.name}" will be applied.`, "info");
           window._pendingTemplateLoad = tpl;
+          showToast(`"${entry?.name}" ready — upload a reference PDF to see and edit its overlays.`, "info");
         }
       }
 
@@ -3341,64 +3397,17 @@
       // renderStep1TemplateList is a no-op — the editor start screen no longer has a template list
       function renderStep1TemplateList() { /* no-op */ }
 
-      // ── Autosave engine (only fires if template already saved to library) ──
+      // ── Autosave disabled — manual save only ──
       let _autosaveTimer = null;
+      function scheduleAutosave() { /* no-op: autosave disabled */ }
+      function commitAutosave() { /* no-op: autosave disabled */ }
 
-      // Called by every edit action — debounces and writes to localStorage
-      function scheduleAutosave() {
-        clearTimeout(_autosaveTimer);
-        _autosaveTimer = setTimeout(commitAutosave, 800);
-      }
+      // initNewTemplateSession is intentionally not auto-creating a library entry.
+      // When a fresh PDF is loaded the user must name and Save manually.
+      function initNewTemplateSession() { /* no-op: user saves manually */ }
 
-      function commitAutosave() {
-        if (!window._currentLibraryId) return;
-        const idx = lsGetIndex();
-        const entry = idx.find((e) => e.id === window._currentLibraryId);
-        if (!entry) return;
-
-        const name =
-          document.getElementById("templateNameInput")?.value?.trim() ||
-          entry.name ||
-          "Untitled Template";
-        const pps =
-          parseInt(document.getElementById("pagesPerStudent").value) || 1;
-        const boxes = editorPageData.filter((p) => p).map((p) => p.boxes);
-        const elementCount = boxes.reduce((s, b) => s + b.length, 0);
-
-        lsSaveTemplate(window._currentLibraryId, {
-          pagesPerStudent: pps,
-          boxes,
-        });
-        entry.name = name;
-        entry.savedAt = Date.now();
-        entry.pagesPerStudent = pps;
-        entry.elementCount = elementCount;
-        lsSaveIndex(idx);
-        flashAutosave();
-      }
-
-      // Called when a new PDF is loaded into the editor — creates a fresh library entry
-      function initNewTemplateSession() {
-        const id = lsNewId();
-        const name = "Untitled Template";
-        window._currentLibraryId = id;
-        const idx = lsGetIndex();
-        idx.push({
-          id,
-          name,
-          savedAt: Date.now(),
-          pagesPerStudent: 1,
-          elementCount: 0,
-        });
-        lsSaveIndex(idx);
-        const nameInput = document.getElementById("templateNameInput");
-        if (nameInput) nameInput.value = name;
-      }
-
-      // Called when user types in the name field
-      function onTemplateNameChange() {
-        scheduleAutosave();
-      }
+      // Called when user types in the name field — no autosave
+      function onTemplateNameChange() { /* no-op */ }
 
       function flashAutosave() {
         const badge = document.getElementById("autosaveBadgeInline");
