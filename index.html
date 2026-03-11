@@ -404,9 +404,28 @@
       background: rgba(207, 127, 75, 0.08);
     }
 
+    @keyframes tpl-select-pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(207, 127, 75, 0.55);
+      }
+
+      60% {
+        box-shadow: 0 0 0 6px rgba(207, 127, 75, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(207, 127, 75, 0);
+      }
+    }
+
     .tpl-item.selected-tpl {
       border-color: #cf7f4b;
-      background: rgba(207, 127, 75, 0.12);
+      background: rgba(207, 127, 75, 0.15);
+      box-shadow: 0 0 0 1px rgba(207, 127, 75, 0.3);
+    }
+
+    .tpl-item.selected-tpl.just-selected {
+      animation: tpl-select-pulse 0.6s ease-out forwards;
     }
 
     .tpl-item .tpl-name {
@@ -640,9 +659,6 @@
               New Template
             </button>
           </div>
-
-          <!-- Status line -->
-          <div id="batchTemplateStatus" class="mt-2 text-xs font-mono text-[#cf7f4b] min-h-[16px]"></div>
 
           <!-- Divider -->
           <div class="w-full flex items-center gap-2 my-3">
@@ -1681,14 +1697,13 @@
               lsSaveIndex(idx);
               refreshAllTemplateLists();
               showToast(`${imported} template${imported !== 1 ? 's' : ''} restored ✓`, "success");
-              document.getElementById("batchTemplateStatus").innerText = `✓ ${imported} template${imported !== 1 ? 's' : ''} restored from backup`;
               return;
             }
 
             // ── Legacy: single template used directly for processing (not saved) ──
             if (data.boxes) {
               loadedBatchTemplate = data;
-              document.getElementById("batchTemplateStatus").innerText = "✓ Template loaded (not saved to library)";
+              showToast("Legacy template loaded (not in library)", "info");
               if (data.pagesPerStudent)
                 document.getElementById("batchPagesPerStudent").value = data.pagesPerStudent;
               const _btn = document.getElementById("btnRunBatch"); if (_btn) _btn.disabled = false;
@@ -1733,8 +1748,6 @@
               if (bpp) bpp.value = favTpl.pagesPerStudent;
             }
             const favEntry = idx.find(e => e.id === fav);
-            const statusEl = document.getElementById("batchTemplateStatus");
-            if (statusEl) statusEl.innerText = "✓ " + escHtml(favEntry?.name || "Favourite") + " loaded";
             const _btn = document.getElementById("btnRunBatch"); if (_btn) _btn.disabled = false;
           }
         }
@@ -1751,10 +1764,8 @@
           const isSelected = _selectedRunTplId === entry.id;
 
           const item = document.createElement("div");
-          item.className = "group flex items-center gap-1.5 px-2 py-2 rounded-lg border transition-all cursor-pointer " +
-            (isSelected
-              ? "border-[#cf7f4b] bg-[#cf7f4b]/12"
-              : "border-transparent hover:border-[#555] hover:bg-white/[0.03]");
+          item.className = "tpl-item group flex items-center gap-1.5 px-2 py-2 rounded-lg border transition-all cursor-pointer" +
+            (isSelected ? " selected-tpl" : "");
           item.dataset.id = entry.id;
 
           // ★ Favourite toggle
@@ -1765,12 +1776,15 @@
           favBtn.textContent = isFav ? "★" : "☆";
           favBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleFavourite(entry.id); });
 
-          // Name + meta
+          // Name + meta (with loaded dot for selected)
           const nameWrap = document.createElement("div");
           nameWrap.className = "flex-1 min-w-0";
           nameWrap.innerHTML = `
-          <div class="text-sm font-semibold text-white truncate" title="${escHtml(entry.name)}">${escHtml(entry.name)}</div>
-          <div class="text-[10px] text-gray-500 font-mono">${entry.pagesPerStudent || 1}p/student · ${timeAgo(entry.savedAt)}</div>
+          <div class="flex items-center gap-1.5">
+            ${isSelected ? '<span title="Active template" style="width:7px;height:7px;border-radius:50%;background:#cf7f4b;flex-shrink:0;display:inline-block;box-shadow:0 0 5px #cf7f4b88;"></span>' : ''}
+            <div class="text-sm font-semibold truncate ${isSelected ? 'text-[#cf7f4b]' : 'text-white'}" title="${escHtml(entry.name)}">${escHtml(entry.name)}</div>
+          </div>
+          <div class="text-[10px] text-gray-500 font-mono ${isSelected ? 'pl-[14px]' : ''}">${entry.pagesPerStudent || 1}p/student · ${timeAgo(entry.savedAt)}</div>
         `;
 
           // ✏️ Rename button
@@ -1808,10 +1822,14 @@
             loadedBatchTemplate = tpl;
             if (tpl.pagesPerStudent)
               document.getElementById("batchPagesPerStudent").value = tpl.pagesPerStudent;
-            document.getElementById("batchTemplateStatus").innerText = "✓ " + escHtml(entry.name) + " loaded";
             const _btn = document.getElementById("btnRunBatch"); if (_btn) _btn.disabled = false;
             renderTemplateSelectorOnRunTab(); // re-render to update selected highlight
-            showToast(`"${entry.name}" selected — now add your PDFs in Step 3`, "success");
+            // Pulse the newly selected row
+            const newItem = document.querySelector(`[data-id="${entry.id}"]`);
+            if (newItem) {
+              newItem.classList.add("just-selected");
+              newItem.addEventListener("animationend", () => newItem.classList.remove("just-selected"), { once: true });
+            }
           });
 
           list.appendChild(item);
